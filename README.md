@@ -2,11 +2,11 @@
 
 A small Terraform deployment for an AWS DevOps interview: a web frontend/API on private EKS workers, backed by RDS PostgreSQL in separate isolated subnets. An internet-facing ALB exposes the application. IAM, TLS, security groups and NetworkPolicy protect distinct parts of the request path.
 
-[![Validation](https://github.com/westfood/orbit-aws-devops-assignment/actions/workflows/ci.yml/badge.svg)](https://github.com/westfood/orbit-aws-devops-assignment/actions/workflows/ci.yml)
+[![Validation](https://github.com/westfood/aws-eks-assignment/actions/workflows/ci.yml/badge.svg)](https://github.com/westfood/aws-eks-assignment/actions/workflows/ci.yml)
 
 **Deployment status:** prepared without an AWS account. The container image and Compose database roundtrip passed in GitHub Actions. An AWS plan/apply, ECR push, ingress, RDS IAM/TLS checks and teardown must still be performed and recorded. CI does not establish live AWS behavior.
 
-Verification on **3 November 2026**: [all five CI jobs passed](https://github.com/westfood/orbit-aws-devops-assignment/actions/runs/41646044307) at commit `1c57894`. They validated all three Terraform roots, ran 11 mocked Terraform checks, 23 application tests against PostgreSQL 17 and 6 helper tests, built the actual image, exercised Compose write/read, and checked UID `10001` and a read-only root filesystem. An isolated native PostgreSQL 18.6 instance and a real browser also exercised local desktop/mobile behavior. RDS IAM/TLS and AWS networking remain unverified.
+Verification on **3 November 2026**: [all five CI jobs passed](https://github.com/westfood/aws-eks-assignment/actions/runs/41646044307) at commit `1c57894`. They validated all three Terraform roots, ran 11 mocked Terraform checks, 23 application tests against PostgreSQL 17 and 6 helper tests, built the actual image, exercised Compose write/read, and checked UID `10001` and a read-only root filesystem. An isolated native PostgreSQL 18.6 instance and a real browser also exercised local desktop/mobile behavior. RDS IAM/TLS and AWS networking remain unverified.
 
 ![Architecture](docs/architecture.png)
 
@@ -22,8 +22,8 @@ The default uses two worker nodes, one NAT Gateway and a Single-AZ database. Two
 Use Terraform `>=1.14,<2`, AWS CLI `>=2.32`, `kubectl`, Python 3.12+, Docker with Buildx and Git. Run commands from the repository root in a Bash/Zsh terminal. Set a restrictive file-creation mask for local plans, outputs and kubeconfig:
 
 ```bash
-git clone https://github.com/westfood/orbit-aws-devops-assignment.git
-cd orbit-aws-devops-assignment
+git clone https://github.com/westfood/aws-eks-assignment.git
+cd aws-eks-assignment
 umask 077
 mkdir -p .local
 terraform version

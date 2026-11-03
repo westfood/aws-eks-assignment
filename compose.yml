@@ -1,5 +1,5 @@
 # Isolated local application test. This does not emulate or validate AWS networking.
-name: orbit-assignment-local
+name: aws-eks-assignment-local
 
 x-database: &database
   APP_ENV: local
@@ -29,7 +29,7 @@ services:
       retries: 20
 
   bootstrap:
-    image: orbit-demo:local
+    image: aws-eks-demo:local
     build: ./app
     command: ["python", "-m", "demo.bootstrap"]
     environment:
@@ -45,7 +45,7 @@ services:
     tmpfs: ["/tmp:size=16m,mode=1777"]
 
   app:
-    image: orbit-demo:local
+    image: aws-eks-demo:local
     build: ./app
     environment: *database
     depends_on:
