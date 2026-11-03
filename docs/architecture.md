@@ -4,7 +4,19 @@ This is an implementation design, not evidence of an AWS deployment. The reposit
 
 ![Network architecture](architecture.png)
 
-The diagram is also available as [editable SVG](architecture.svg), [Mermaid source](architecture.mmd), and [a reproducible diagram generator](render_architecture.py).
+The [draw.io file](architecture.drawio) is the editable source, using native AWS library icons and connectors. It has two pages: **Network and request path** and **Identity and database access**. The [SVG](architecture.svg) and PNG above are exports of the first page. The [Mermaid flow](architecture.mmd) remains a text-based overview.
+
+[Open the published diagram in draw.io](https://app.diagrams.net/?splash=0&libs=aws4#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fwestfood%2Faws-eks-assignment%2Fmain%2Fdocs%2Farchitecture.drawio), or open the local `.drawio` file in draw.io Desktop. In the browser, you can also choose **Device → Open Existing Diagram** and select the file. To add AWS icons, select **More Shapes → Networking → AWS**, then **Apply**. Shapes, labels, groups and connectors remain editable. Save edits back to `docs/architecture.drawio`, export the previews and commit the updated files.
+
+![Identity and database access](architecture-identity.png)
+
+Export both pages again after editing the source. The helper uses draw.io Desktop, tested with version **32.6.1**; it does not rebuild or overwrite the editable diagram:
+
+```bash
+python3 docs/render_architecture.py
+```
+
+If the executable is not installed on PATH or in the standard macOS Applications folder, set `DRAWIO_BIN` to its location. The helper writes `architecture.svg`, `architecture.png`, `architecture-identity.svg` and `architecture-identity.png`, with the diagram embedded in the exports. You can also export from draw.io using **File → Export as → SVG/PNG**.
 
 ## Request path
 

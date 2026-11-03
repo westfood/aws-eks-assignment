@@ -8,6 +8,8 @@ The English deck contains 10 slides for the assignment's 10–15 minute stakehol
 
 The architecture diagrams and comparison table are native editable PowerPoint objects. The deck does not claim the AWS implementation has been deployed or integration-tested. The multi-account landing zone is a recommendation, not an additional deployed part of the hands-on task.
 
+The detailed architecture is also available as an [editable draw.io diagram](../docs/architecture.drawio) with AWS icons and separate network and identity pages. The slides use a simplified overview for the stakeholder discussion.
+
 ## Regeneration
 
 The builder uses the supplied Codex presentation runtime's `@oai/artifact-tool`. It does not use `python-pptx` or PptxGenJS. Node.js, Python, presentation validators and the artifact package must be available. On the authoring computer:

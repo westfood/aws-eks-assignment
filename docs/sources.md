@@ -2,6 +2,13 @@
 
 Primary technical documentation reviewed on **3 November 2026**. These references support the design and discussion, not a claim that AWS integration has already been tested.
 
+## Diagram format and icons
+
+- [draw.io AWS libraries](https://www.drawio.com/docs/diagram-types/aws-diagrams/): enabling native AWS shapes, editable diagrams and image export.
+- [AWS Architecture Icons](https://aws.amazon.com/architecture/icons/): AWS-approved architecture notation and icon guidance.
+- [Official draw.io AWS4 palette](https://github.com/jgraph/drawio/blob/v32.6.1/src/main/webapp/js/diagramly/sidebar/Sidebar-AWS4.js): native AWS shape identifiers and category colors.
+- [draw.io Desktop 32.6.1](https://github.com/jgraph/drawio-desktop/releases/tag/v32.6.1): renderer used for the checked-in PNG/SVG exports. Its export CLI uses 1-based page indices.
+
 ## Account access
 
 - [AWS CLI browser login and credential-process sharing](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html): temporary development credentials without long-lived access keys, CLI version and sign-in permission requirements.

@@ -10,7 +10,7 @@ Verification on **3 November 2026**: [all five CI jobs passed](https://github.co
 
 ![Architecture](docs/architecture.png)
 
-- [Architecture and network boundaries](docs/architecture.md), [decisions](docs/decisions.md), [editable diagram](docs/architecture.mmd)
+- [Architecture and network boundaries](docs/architecture.md), [decisions](docs/decisions.md), [editable draw.io diagram](docs/architecture.drawio)
 - [Interview walkthrough](docs/interview-walkthrough.md), [cost and cleanup](docs/cost-and-cleanup.md), [primary sources](docs/sources.md)
 - Presentation: see `presentation/` for the English stakeholder deck and speaker notes.
 - Application: see `app/` for the frontend, database code, tests and image.
