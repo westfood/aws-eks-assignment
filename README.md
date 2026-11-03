@@ -2,9 +2,11 @@
 
 A small Terraform deployment for an AWS DevOps interview: a web frontend/API on private EKS workers, backed by RDS PostgreSQL in separate isolated subnets. An internet-facing ALB exposes the application. IAM, TLS, security groups and NetworkPolicy protect distinct parts of the request path.
 
-**Deployment status:** prepared without an AWS account. Local validation and application tests do not establish live AWS behavior. An AWS plan/apply, image build/push, ingress, RDS IAM/TLS checks and teardown must still be performed and recorded. The Docker/Compose route has not been verified on the preparation machine because its Docker runtime is unavailable.
+[![Validation](https://github.com/westfood/orbit-aws-devops-assignment/actions/workflows/ci.yml/badge.svg)](https://github.com/westfood/orbit-aws-devops-assignment/actions/workflows/ci.yml)
 
-Local verification on **3 November 2026**: Terraform formatting and validation passed; 11 mocked Terraform runs, 23 application tests and 6 helper tests passed. An isolated native PostgreSQL 18.6 test and a real browser exercised local application read/write behavior. This does not verify the PostgreSQL 17 container or RDS. The container-image/Compose route and live AWS acceptance remain unverified; CI results must be checked separately after the first repository run.
+**Deployment status:** prepared without an AWS account. The container image and Compose database roundtrip passed in GitHub Actions. An AWS plan/apply, ECR push, ingress, RDS IAM/TLS checks and teardown must still be performed and recorded. CI does not establish live AWS behavior.
+
+Verification on **3 November 2026**: [all five CI jobs passed](https://github.com/westfood/orbit-aws-devops-assignment/actions/runs/41646044307) at commit `1c57894`. They validated all three Terraform roots, ran 11 mocked Terraform checks, 23 application tests against PostgreSQL 17 and 6 helper tests, built the actual image, exercised Compose write/read, and checked UID `10001` and a read-only root filesystem. An isolated native PostgreSQL 18.6 instance and a real browser also exercised local desktop/mobile behavior. RDS IAM/TLS and AWS networking remain unverified.
 
 ![Architecture](docs/architecture.png)
 
@@ -20,6 +22,8 @@ The default uses two worker nodes, one NAT Gateway and a Single-AZ database. Two
 Use Terraform `>=1.14,<2`, AWS CLI `>=2.32`, `kubectl`, Python 3.12+, Docker with Buildx and Git. Run commands from the repository root in a Bash/Zsh terminal. Set a restrictive file-creation mask for local plans, outputs and kubeconfig:
 
 ```bash
+git clone https://github.com/westfood/orbit-aws-devops-assignment.git
+cd orbit-aws-devops-assignment
 umask 077
 mkdir -p .local
 terraform version
@@ -68,6 +72,7 @@ EKS needs an **IAM user/role ARN**, rather than an STS session ARN. Preserve the
 
 ```bash
 CALLER_ARN="$(aws sts get-caller-identity --query Arn --output text)"
+ADMIN_PRINCIPAL_ARN=""
 case "$CALLER_ARN" in
   arn:aws:iam::*:user/*)
     ADMIN_PRINCIPAL_ARN="$CALLER_ARN"
@@ -287,7 +292,7 @@ Compose uses local-only passwords and disables DB TLS solely for the isolated lo
 
 ## Tear down safely
 
-Keep SSO credentials valid and retain the controller until its Ingress has been removed. First save the ALB ARN for the deletion waiter, then destroy the managed Ingress alone so its finalizer can clean up AWS resources:
+Keep your login credentials valid and retain the controller until its Ingress has been removed. First save the ALB ARN for the deletion waiter, then plan removal of the managed Ingress and any dependent DNS record. Check that the targeted plan keeps the controller running so the Ingress finalizer can clean up AWS resources:
 
 ```bash
 ALB_HOSTNAME="$(terraform -chdir=platform output -raw alb_hostname)"
@@ -331,4 +336,4 @@ terraform -chdir=infra apply ../.local/infra-destroy.tfplan
 
 Check the Region for leftover ALBs, target groups, ENIs, NAT Gateways, EIPs, EBS volumes, RDS resources, snapshots and logs. Retained snapshots and state storage can continue charging. Keep the state bucket and bootstrap state until deletion is confirmed and the desired recovery history is retained. Bucket versioning retains old object versions; destroying application infrastructure does not empty it. [Full retention checklist](docs/cost-and-cleanup.md)
 
-The public GitHub submission should include source code, the presentation, diagrams and reproducible verification instructions. Exclude the assignment attachment, correspondence, credentials, state, plans, real inputs and private test evidence.
+The public repository contains source, synthetic test evidence and the presentation. Assignment correspondence, the source attachment, credentials, state, plans and real deployment inputs are excluded.
