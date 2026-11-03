@@ -19,19 +19,25 @@ The default uses two worker nodes, one NAT Gateway and a Single-AZ database. Two
 
 ## 1. Prepare tools and an AWS identity
 
-Use Terraform `>=1.14,<2`, AWS CLI `>=2.32`, `kubectl`, Python 3.12+, Docker with Buildx and Git. Run commands from the repository root in a Bash/Zsh terminal. Set a restrictive file-creation mask for local plans, outputs and kubeconfig:
+Install [mise](https://mise.jdx.dev/getting-started.html), Git, and a working Docker engine with the Compose and Buildx plugins. The project records its development tools in [mise.toml](mise.toml) and their platform-specific downloads in [mise.lock](mise.lock). The same configuration supplies Python and Terraform in CI. The lock covers macOS ARM64 and Linux x86-64.
+
+Run commands from the repository root in a Bash/Zsh terminal. Review the mise configuration and tasks before trusting it, install the locked tools, then load them into this terminal:
 
 ```bash
 git clone https://github.com/westfood/aws-eks-assignment.git
 cd aws-eks-assignment
+cat mise.toml
+mise trust
+mise install --locked
+eval "$(mise env -s zsh)" # Use -s bash in Bash
 umask 077
 mkdir -p .local
-terraform version
-aws --version
-kubectl version --client
-python3 --version
-docker buildx version
+mise ls --current
+mise run tools:check
+mise run tools:docker
 ```
+
+The environment command applies to the current terminal session. Run it again when opening another terminal, or use `mise exec -- terraform version` to apply the project toolset to one command. Persistent shell activation is optional; see [mise shell setup](https://mise.jdx.dev/shell-setup.html). `tools:check` verifies the selected CLI versions. `tools:docker` checks the engine, Compose and Buildx without starting or changing containers. draw.io Desktop is optional for diagram exports, and presentation regeneration also needs the authoring runtime described in `presentation/`.
 
 If there is no account yet, create one at [AWS signup](https://portal.aws.amazon.com/billing/signup), secure its root login with MFA and configure billing alerts. Use the root identity only for account setup. Choose a plan that permits the required services and review the estimate in [cost and cleanup](docs/cost-and-cleanup.md); EKS is not an automatically free lab. [Root-user guidance](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html)
 
@@ -263,7 +269,25 @@ Also confirm the ALB target group is healthy, the WAF association/rules exist, a
 
 ## Local checks without AWS
 
-Formatting and provider validation can run without an account after provider downloads. Backend-free initialization does not connect to the state bucket:
+After the mise setup, run all account-free checks with:
+
+```bash
+mise run check
+```
+
+This checks tool versions, app and helper tests, workflow syntax and all three Terraform roots. It downloads dependencies when needed; it performs no AWS deployment. Application DB integration is skipped unless the explicit local database settings are supplied, as described in `app/`. `mise tasks ls` lists the tasks, including these individual checks:
+
+| Task | Purpose |
+| --- | --- |
+| `mise run tools:check` | Verify project CLI versions |
+| `mise run tools:docker` | Check Docker engine and plugins |
+| `mise run app:setup` | Create `app/.venv` and install locked Python packages |
+| `mise run app:test` | Run app tests, preparing the virtual environment first |
+| `mise run helpers:test` | Run deployment-helper tests |
+| `mise run tf:check` | Format-check, initialize, validate and mock-test Terraform |
+| `mise run diagrams:export` | Export the draw.io pages; requires draw.io Desktop |
+
+For manual inspection, the Terraform and helper commands remain available after loading the mise environment. Backend-free initialization does not connect to the state bucket:
 
 ```bash
 terraform fmt -check -recursive

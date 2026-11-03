@@ -4,7 +4,7 @@ A small, same-origin web frontend and Flask API prove the full browser → appli
 
 ## Run locally
 
-From the repository root:
+From the repository root, after completing the mise setup in the [root README](../README.md). This route also requires a running Docker engine and the Compose plugin:
 
 ```sh
 docker compose up --build -d app
@@ -70,16 +70,15 @@ RDS's master user is not a PostgreSQL superuser. Initialization therefore create
 
 ## Tests
 
-Use Python 3.12 and an isolated virtual environment:
+Use the repository's mise-pinned Python and an isolated virtual environment. From the repository root, complete `mise install --locked` after reviewing/trusting the config, then run:
 
 ```sh
-cd app
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m unittest discover -s tests -v
+mise run app:test
 ```
 
-Unit tests require no AWS credentials, Docker engine or database. The four PostgreSQL integration tests are skipped unless explicitly enabled. To run them against the dedicated Compose database, after starting Compose:
+The task first runs `app:setup`, which creates `app/.venv` using the selected Python, installs `app/requirements.txt` and checks package compatibility. Run `mise run app:setup` alone when you only need the environment. The tool versions come from the root mise configuration; Python packages remain pinned separately in `requirements.txt`.
+
+Unit tests require no AWS credentials, Docker engine or database. The four PostgreSQL integration tests are skipped unless explicitly enabled. To run them against the dedicated Compose database, after starting Compose and from the repository root:
 
 ```sh
 APP_ENV=local DB_AUTH=password \
@@ -87,7 +86,7 @@ DB_HOST=127.0.0.1 DB_PORT=55432 DB_NAME=contoso DB_USER=contoso_app \
 DB_PASSWORD=local-demo-only DB_SSLMODE=disable \
 BOOTSTRAP_DB_USER=postgres BOOTSTRAP_DB_PASSWORD=local-admin-only \
 RUN_DB_INTEGRATION=1 \
-.venv/bin/python -m unittest discover -s tests -v
+mise run app:test
 ```
 
 Integration tests are for the disposable local demo database only. They initialize the schema twice, verify real read/write and literal SQL/HTML payload handling, check runtime privilege restrictions, and create/remove a uniquely named database and roles to verify bootstrap without PostgreSQL `SUPERUSER`. They remove only their own marker rows and fixture database/roles. The supplied local admin must have sufficient privileges for those fixtures.

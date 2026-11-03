@@ -12,7 +12,9 @@ The detailed architecture is also available as an [editable draw.io diagram](../
 
 ## Regeneration
 
-The builder uses the supplied Codex presentation runtime's `@oai/artifact-tool`. It does not use `python-pptx` or PptxGenJS. Node.js, Python, presentation validators and the artifact package must be available. On the authoring computer:
+The builder uses the supplied Codex presentation runtime's `@oai/artifact-tool`. It does not use `python-pptx` or PptxGenJS. Node.js, Python, presentation validators and the artifact package must be available.
+
+The root mise configuration supplies Node.js for the builder. The bundled presentation runtime below remains an additional authoring dependency, including the Python validator environment; installing the project's mise tools alone does not provide the artifact package or validators. The checked-in PowerPoint can be used without regenerating it. After completing the root mise setup, run these commands on the authoring computer:
 
 ```bash
 cd presentation
@@ -22,9 +24,9 @@ export RUNTIME_PYTHON="$PRESENTATION_RUNTIME_ROOT/dependencies/python/bin/python
 export PRESENTATIONS_SKILL_DIR="$HOME/.codex/plugins/cache/openai-primary-runtime/presentations/26.1020.11618/skills/presentations"
 ln -s "$RUNTIME_NODE_MODULES" node_modules  # only if the link does not already exist
 PRESENTATION_OUTPUT_NAME=contoso-iac-recommendation-revised.pptx \
-  "$PRESENTATION_RUNTIME_ROOT/dependencies/node/bin/node" build.mjs
+  mise exec -- node build.mjs
 ```
 
-For another computer, set the runtime variables and use its Node executable. This authoring dependency is bundled with Codex and is not a dependency of the AWS application. Choose a new output filename on each revision because validation deliberately refuses to overwrite an existing final deck. The builder exports each slide to `.build/previews/`, exports a candidate deck and runs package, geometry, font, native-table and re-import checks before producing the final file. Inspect every rendered slide before accepting a revision.
+For another computer, set the runtime variables to its authoring-runtime paths. This authoring dependency is bundled with Codex and is not a dependency of the AWS application. Choose a new output filename on each revision because validation deliberately refuses to overwrite an existing final deck. The builder exports each slide to `.build/previews/`, exports a candidate deck and runs package, geometry, font, native-table and re-import checks before producing the final file. Inspect every rendered slide before accepting a revision.
 
 Primary AWS and HashiCorp sources are cited in the deck's speaker notes and the Markdown notes. No source assignment PDF, email, account identifier or credential is included.

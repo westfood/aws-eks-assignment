@@ -13,10 +13,10 @@ The [draw.io file](architecture.drawio) is the editable source, using native AWS
 Export both pages again after editing the source. The helper uses draw.io Desktop, tested with version **32.6.1**; it does not rebuild or overwrite the editable diagram:
 
 ```bash
-python3 docs/render_architecture.py
+mise run diagrams:export
 ```
 
-If the executable is not installed on PATH or in the standard macOS Applications folder, set `DRAWIO_BIN` to its location. The helper writes `architecture.svg`, `architecture.png`, `architecture-identity.svg` and `architecture-identity.png`, with the diagram embedded in the exports. You can also export from draw.io using **File → Export as → SVG/PNG**.
+This uses the project's mise-pinned Python after the setup in the root README. draw.io Desktop is a separate optional application. If its executable is not installed on PATH or in the standard macOS Applications folder, set `DRAWIO_BIN` to its location. The helper writes `architecture.svg`, `architecture.png`, `architecture-identity.svg` and `architecture-identity.png`, with the diagram embedded in the exports. You can also export from draw.io using **File → Export as → SVG/PNG**.
 
 ## Request path
 

@@ -2,6 +2,12 @@
 
 Primary technical documentation reviewed on **3 November 2026**. These references support the design and discussion, not a claim that AWS integration has already been tested.
 
+## Development toolchain
+
+- [mise getting started](https://mise.jdx.dev/getting-started.html): project tool configuration, installation, trust and task discovery.
+- [mise environment command](https://mise.jdx.dev/cli/env.html): loading the project environment once into the current shell.
+- [mise continuous integration](https://mise.jdx.dev/continuous-integration.html): using the project tool configuration in CI.
+
 ## Diagram format and icons
 
 - [draw.io AWS libraries](https://www.drawio.com/docs/diagram-types/aws-diagrams/): enabling native AWS shapes, editable diagrams and image export.

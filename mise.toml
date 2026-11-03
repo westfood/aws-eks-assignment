@@ -1,0 +1,62 @@
+# Project tool versions. Commit changes together with mise.lock.
+min_version = "2026.10.11"
+
+[settings]
+# Ensure project tools win over Homebrew/system binaries already on PATH.
+activate_aggressive = true
+
+[tools]
+terraform = "1.14.8"
+python = "3.12.16"
+awscli = "2.39.3"
+kubectl = "1.36.6"
+helm = "3.22.1"
+node = "24.22.2"
+actionlint = "1.7.12"
+
+[tasks."tools:check"]
+description = "Check that this shell uses the project's pinned CLI tools"
+run = "python scripts/check-tools.py"
+
+[tasks."tools:docker"]
+description = "Read-only Docker engine, Compose and Buildx preflight"
+run = "python scripts/check-tools.py --docker"
+
+[tasks."app:setup"]
+description = "Create the project virtualenv and install locked app dependencies"
+run = [
+  "python -m venv app/.venv",
+  "app/.venv/bin/python -m pip install --requirement app/requirements.txt",
+  "app/.venv/bin/python -m pip check",
+]
+
+[tasks."app:test"]
+description = "Run application tests; DB integration requires explicit environment settings"
+depends = ["app:setup"]
+dir = "app"
+run = ".venv/bin/python -m unittest discover -s tests -v"
+
+[tasks."helpers:test"]
+description = "Run deployment helper tests without AWS"
+run = "python -m unittest discover -s scripts -p 'test_*.py' -v"
+
+[tasks."tf:check"]
+description = "Validate all Terraform roots and run mocked provider tests without AWS"
+run = '''
+set -eu
+terraform fmt -check -recursive
+for tf_root in bootstrap infra platform; do
+  terraform -chdir="$tf_root" init -backend=false -input=false -lockfile=readonly
+  terraform -chdir="$tf_root" validate -no-color
+  terraform -chdir="$tf_root" test -no-color
+done
+'''
+
+[tasks."diagrams:export"]
+description = "Export draw.io pages (requires draw.io Desktop or DRAWIO_BIN)"
+run = "python docs/render_architecture.py"
+
+[tasks.check]
+description = "Run tool, app, helper, workflow and mocked Terraform checks; no AWS deployment"
+depends = ["tools:check", "app:test", "helpers:test", "tf:check"]
+run = "actionlint"
