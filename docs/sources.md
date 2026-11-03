@@ -53,6 +53,21 @@ Primary technical documentation reviewed on **3 November 2026**. These reference
 - [AWS Shield](https://docs.aws.amazon.com/waf/latest/developerguide/shield-chapter.html): Standard and Advanced protection scopes.
 - [CloudFront Origin Access Control for S3](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html): proposed private-origin frontend architecture.
 
+## Container image security
+
+- [ECR scanning comparison](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html): Basic versus Enhanced scope and the `DescribeImageScanFindings` results API.
+- [ECR Basic scanning](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-basic.html): OS coverage, scan frequency and per-image scan limits.
+- [AWS-native Basic scanning announcement](https://aws.amazon.com/about-aws/whats-new/2024/08/new-version-amazon-ecr-basic-scanning/): availability without additional scanning cost.
+- [ECR Enhanced scanning](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-enhanced.html): Inspector integration, language packages, charges and unmatched repositories.
+- [ECR filter behavior](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-filters.html): prefix/wildcard semantics and unmatched repository settings.
+- [Inspector ECR scanning](https://docs.aws.amazon.com/inspector/latest/user/scanning-ecr.html): event-driven scans, account-dependent eligibility defaults and supported media types.
+- [ECR scan status](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_ImageScanStatus.html), [paginated findings](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImageScanFindings.html): release-gate response fields.
+- [Pinned Terraform ECR registry resource](https://github.com/hashicorp/terraform-provider-aws/blob/v6.71.0/website/docs/r/ecr_registry_scanning_configuration.html.markdown): account/Region policy ownership and reset-to-Basic destroy behavior.
+- [ECR managed signing](https://docs.aws.amazon.com/AmazonECR/latest/userguide/managed-signing.html), [EKS signature verification](https://docs.aws.amazon.com/eks/latest/userguide/image-verification.html): AWS Signer plus separately configured Kubernetes admission enforcement.
+- [GuardDuty EKS Runtime Monitoring](https://docs.aws.amazon.com/guardduty/latest/ug/how-runtime-monitoring-works-eks.html): agent deployment, supported compute and account-wide scope.
+- [Inspector Security Hub CSPM integration](https://docs.aws.amazon.com/inspector/latest/user/securityhub-integration.html), [Inspector EventBridge events](https://docs.aws.amazon.com/inspector/latest/user/eventbridge-integration.html): optional finding aggregation and notifications.
+- [Inspector CI/CD integration](https://docs.aws.amazon.com/inspector/latest/user/scanning-cicd.html): SBOM Generator, Scan API and supported pipeline integrations.
+
 ## Cost
 
 - [AWS Pricing Calculator](https://calculator.aws/)
@@ -63,6 +78,8 @@ Primary technical documentation reviewed on **3 November 2026**. These reference
 - [Elastic Load Balancing pricing](https://aws.amazon.com/elasticloadbalancing/pricing/)
 - [WAF pricing](https://aws.amazon.com/waf/pricing/)
 - [Secrets Manager pricing](https://aws.amazon.com/secrets-manager/pricing/)
+- [ECR pricing](https://aws.amazon.com/ecr/pricing/), [Inspector pricing](https://aws.amazon.com/inspector/pricing/)
+- [GuardDuty pricing](https://aws.amazon.com/guardduty/pricing/), [Security Hub pricing](https://aws.amazon.com/security-hub/pricing/)
 - [S3 pricing](https://aws.amazon.com/s3/pricing/)
 - [AWS Budgets](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html)
 

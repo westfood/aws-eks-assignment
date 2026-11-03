@@ -11,7 +11,7 @@ Verification on **3 November 2026**: [all six CI jobs passed](https://github.com
 ![Architecture](docs/architecture.png)
 
 - [Architecture and network boundaries](docs/architecture.md), [decisions](docs/decisions.md), [editable draw.io diagram](docs/architecture.drawio)
-- [Environment targeting](docs/environments.md), [interview walkthrough](docs/interview-walkthrough.md), [cost and cleanup](docs/cost-and-cleanup.md), [primary sources](docs/sources.md)
+- [Environment targeting](docs/environments.md), [image security](docs/image-security.md), [interview walkthrough](docs/interview-walkthrough.md), [cost and cleanup](docs/cost-and-cleanup.md), [primary sources](docs/sources.md)
 - Presentation: see `presentation/` for the English stakeholder deck and speaker notes.
 - Application: see `app/` for the frontend, database code, tests and image.
 
@@ -48,6 +48,8 @@ cp environments/dev.example.json environments/dev.json
 ```
 
 Edit `environments/dev.json`: provide the real dev account ID, its AWS profile, a globally unique dev state-bucket name, the intended IAM administrator role/user ARN, and your trusted public IPv4 `/32` under `infra.admin_cidrs`. The JSON file is ignored by Git. Use separate account IDs, profiles and buckets when you later prepare `test.json` or `prod.json` from their examples. See [environment configuration and isolation](docs/environments.md).
+
+The examples own the account/Region-wide ECR scanning policy in dedicated assignment accounts: dev uses Basic scanning on push; test/prod use paid Inspector enhanced continuous scanning. In an existing shared account, leave `infra.manage_ecr_registry_scanning=false` and coordinate coverage with the registry owner. Applying a managed policy replaces its rules and can disable scanning for unmatched repositories. Review [image security and registry ownership](docs/image-security.md) before the infrastructure apply.
 
 Authenticate the configured profile using temporary credentials. For a standalone dev account with a console IAM user or federated role, AWS CLI browser login can supply a separate process-credential profile:
 
@@ -128,23 +130,55 @@ mise run target -- --env dev terraform infra output
 
 The output command writes `.local/dev/infra-outputs.json`. Keep the API CIDRs restricted even if application ingress is later made public. Setting `infra.private_only_api=true` requires a VPC-connected workstation or runner for subsequent Kubernetes/Helm operations; it does not create that connection.
 
-## 5. Build and push the dev application image
+## 5. Build, push and scan the dev application image
 
 ECR is account-specific. Read the repository from dev's managed outputs and build `linux/amd64` for the x86-64 managed nodes, including from an Apple Silicon Mac:
 
 ```bash
-ECR_REPOSITORY="$(python3 -c 'import json; print(json.load(open(".local/dev/infra-outputs.json"))["ecr_repository_url"]["value"])')"
+ECR_REPOSITORY="$(mise exec -- python -c 'import json; print(json.load(open(".local/dev/infra-outputs.json"))["ecr_repository_url"]["value"])')"
 ECR_REGISTRY="${ECR_REPOSITORY%%/*}"
 ECR_NAME="${ECR_REPOSITORY#*/}"
 IMAGE_TAG="demo-$(date -u +%Y%m%d%H%M%S)"
 mise run target -- --env dev aws ecr get-login-password | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 docker buildx build --platform linux/amd64 --tag "$ECR_REPOSITORY:$IMAGE_TAG" --push ./app
-IMAGE_DIGEST="$(mise run target -- --env dev aws ecr describe-images --repository-name "$ECR_NAME" --image-ids imageTag="$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
+ROOT_IMAGE_DIGEST="$(mise run target -- --env dev aws ecr describe-images --repository-name "$ECR_NAME" --image-ids imageTag="$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
+docker buildx imagetools inspect --raw "$ECR_REPOSITORY@$ROOT_IMAGE_DIGEST" > .local/dev/build-manifest.json
+IMAGE_DIGEST="$(mise exec -- python - "$ROOT_IMAGE_DIGEST" <<'PY'
+import json
+import re
+import sys
+
+with open(".local/dev/build-manifest.json") as stream:
+    manifest = json.load(stream)
+indexes = {
+    "application/vnd.oci.image.index.v1+json",
+    "application/vnd.docker.distribution.manifest.list.v2+json",
+}
+if manifest.get("mediaType") in indexes:
+    matches = [entry for entry in manifest.get("manifests", [])
+               if entry.get("platform", {}).get("os") == "linux"
+               and entry.get("platform", {}).get("architecture") == "amd64"]
+    if len(matches) != 1:
+        raise SystemExit("Expected exactly one linux/amd64 image manifest")
+    digest = matches[0].get("digest", "")
+elif manifest.get("mediaType") in {
+    "application/vnd.oci.image.manifest.v1+json",
+    "application/vnd.docker.distribution.manifest.v2+json",
+}:
+    digest = sys.argv[1]
+else:
+    raise SystemExit("Unsupported image manifest type")
+if not re.fullmatch(r"sha256:[a-f0-9]{64}", digest):
+    raise SystemExit("Invalid image digest")
+print(digest)
+PY
+)"
 APP_IMAGE="$ECR_REPOSITORY@$IMAGE_DIGEST"
 printf '%s\n' "$APP_IMAGE"
+mise run target -- --env dev scan-image --image "$APP_IMAGE"
 ```
 
-Review ECR scan findings. Platform inputs require `repository@sha256:...`, so changing a tag cannot silently replace the deployed image.
+Buildx provenance can make even a single-platform push produce an image index. The selection above retains provenance and chooses the executable `linux/amd64` child digest for scanning and deployment. The gate waits for initial scan completion and blocks High/Critical findings or missing evidence. Basic scanning covers OS packages; test/prod's Enhanced policy also covers Python packages. Platform inputs require `repository@sha256:...`, so changing a tag cannot silently replace the deployed image. See [policy, reports and remediation](docs/image-security.md).
 
 ## 6. Deploy the dev Kubernetes platform
 
@@ -157,6 +191,8 @@ mise run target -- --env dev terraform platform plan
 mise run target -- --env dev terraform platform apply
 mise run target -- --env dev terraform platform output
 ```
+
+Input generation, platform plan and platform apply each query ECR again and require the digest to pass the image policy. A newly discovered blocking vulnerability stops release even if an earlier check passed. Platform destroy operations bypass scanning so cleanup remains possible.
 
 This installs AWS Load Balancer Controller, NetworkPolicies, a DB initialization Job, the frontend/API Deployment, Service and Ingress. The initialization role alone reads the RDS-managed master secret. The serving role permits `rds-db:connect` as the restricted SQL user. Connections use the RDS endpoint and bundled AWS CA with `verify-full`.
 
@@ -179,7 +215,7 @@ mise run target -- --env dev kubeconfig
 mise run target -- --env dev kubectl get nodes
 mise run target -- --env dev kubectl -n contoso get pods,jobs,services,ingresses,networkpolicies
 mise run target -- --env dev kubectl -n contoso rollout status deployment/contoso-app --timeout=5m
-APPLICATION_URL="$(python3 -c 'import json; print(json.load(open(".local/dev/platform-outputs.json"))["application_url"]["value"])')"
+APPLICATION_URL="$(mise exec -- python -c 'import json; print(json.load(open(".local/dev/platform-outputs.json"))["application_url"]["value"])')"
 printf '%s\n' "$APPLICATION_URL"
 mise run target -- --env dev demo
 ```
@@ -187,13 +223,13 @@ mise run target -- --env dev demo
 `demo` performs read-only readiness checks and is deliberately restricted to dev. Open `$APPLICATION_URL`, save a synthetic message and refresh to show persistence. For an explicit automated write/read check:
 
 ```bash
-python3 scripts/verify-live.py --url "$APPLICATION_URL" --write-message
+mise exec -- python scripts/verify-live.py --url "$APPLICATION_URL" --write-message
 ```
 
 Inspect AWS boundaries through the same target:
 
 ```bash
-CLUSTER_NAME="$(python3 -c 'import json; print(json.load(open(".local/dev/infra-outputs.json"))["cluster_name"]["value"])')"
+CLUSTER_NAME="$(mise exec -- python -c 'import json; print(json.load(open(".local/dev/infra-outputs.json"))["cluster_name"]["value"])')"
 mise run target -- --env dev aws rds describe-db-instances --db-instance-identifier "$CLUSTER_NAME" --query 'DBInstances[0].{public:PubliclyAccessible,multiAZ:MultiAZ,iamAuth:IAMDatabaseAuthenticationEnabled,encrypted:StorageEncrypted,subnets:DBSubnetGroup.Subnets[].SubnetIdentifier,groups:VpcSecurityGroups[].VpcSecurityGroupId}'
 mise run target -- --env dev kubectl -n contoso get serviceaccount contoso-app contoso-bootstrap -o yaml
 mise run target -- --env dev kubectl -n contoso describe ingress contoso-app
@@ -219,12 +255,13 @@ This checks tool versions, app/helper tests, workflow syntax and all three Terra
 | `mise run tf:check` | Validate/mock-test all Terraform roots |
 | `mise run diagrams:export` | Export draw.io previews with draw.io Desktop |
 | `mise run target -- --env dev show` | Inspect a configured account target without cloud operations |
+| `mise run target -- --env dev scan-image --image "$APP_IMAGE"` | Verify the selected ECR digest and write a private scan decision report |
 
 For a separate local Compose test:
 
 ```bash
 docker compose up --build --detach
-python3 scripts/verify-live.py --url http://127.0.0.1:18080 --write-message
+mise exec -- python scripts/verify-live.py --url http://127.0.0.1:18080 --write-message
 docker compose down
 ```
 
@@ -235,7 +272,7 @@ Compose uses disposable local passwords and disables DB TLS only in its local se
 The presentation cleanup targets **dev**. Keep the controller running until its Ingress finalizer has removed the ALB. First capture the ALB ARN, then review/apply an Ingress-only destroy plan and wait for AWS deletion:
 
 ```bash
-ALB_HOSTNAME="$(python3 -c 'import json; print(json.load(open(".local/dev/platform-outputs.json"))["alb_hostname"]["value"])')"
+ALB_HOSTNAME="$(mise exec -- python -c 'import json; print(json.load(open(".local/dev/platform-outputs.json"))["alb_hostname"]["value"])')"
 ALB_ARN="$(mise run target -- --env dev aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$ALB_HOSTNAME'].LoadBalancerArn | [0]" --output text)"
 mise run target -- --env dev terraform platform plan --destroy --ingress-only
 mise run target -- --env dev terraform platform apply --destroy --ingress-only
@@ -252,11 +289,14 @@ RDS deletion protection is enabled. In `environments/dev.json`, set `infra.db_de
 mise run target -- --env dev terraform infra plan
 mise run target -- --env dev terraform infra apply
 mise run target -- --env dev aws ecr list-images --repository-name "$ECR_NAME"
-mise run target -- --env dev aws ecr batch-delete-image --repository-name "$ECR_NAME" --image-ids imageDigest="$IMAGE_DIGEST"
+mise run target -- --env dev aws ecr batch-delete-image --repository-name "$ECR_NAME" --image-ids imageDigest="$ROOT_IMAGE_DIGEST"
+if [ "$IMAGE_DIGEST" != "$ROOT_IMAGE_DIGEST" ]; then
+  mise run target -- --env dev aws ecr batch-delete-image --repository-name "$ECR_NAME" --image-ids imageDigest="$IMAGE_DIGEST"
+fi
 mise run target -- --env dev terraform infra plan --destroy
 mise run target -- --env dev terraform infra apply --destroy
 ```
 
-Repeat image deletion for any other reviewed demo digests. Verify the selected account/Region for retained or leftover resources. Snapshots and state storage can continue charging; preserve the state bucket and bootstrap state until deletion and recovery requirements are confirmed. See [cost and cleanup](docs/cost-and-cleanup.md). Test/prod cleanup uses its own explicit target and private artifacts; dev commands do not clean up those accounts.
+Delete a parent index before its referenced child image. Review and remove other demo/provenance artifacts returned by `list-images` before destroying the non-empty repository; the two digest deletions above may not empty it. If this is a new shell, recover the exact reviewed digests from ECR rather than guessing variable values. Destroying a managed registry scanning configuration also resets that account/Region to Basic with no rules. Verify the selected account/Region for retained or leftover resources. Snapshots and state storage can continue charging; preserve the state bucket and bootstrap state until deletion and recovery requirements are confirmed. See [cost and cleanup](docs/cost-and-cleanup.md). Test/prod cleanup uses its own explicit target and private artifacts; dev commands do not clean up those accounts.
 
 The public repository contains source, synthetic test evidence and the presentation. Real environment inputs, correspondence, credentials, state, plans and outputs are excluded.

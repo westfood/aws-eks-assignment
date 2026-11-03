@@ -52,7 +52,14 @@ resource "aws_ecr_repository" "app" {
   name                 = "${local.name}-app"
   image_tag_mutability = "IMMUTABLE"
   force_delete         = false
-  image_scanning_configuration { scan_on_push = true }
+  # Retain the legacy BASIC fallback only when this state does not own the
+  # registry policy. Managed policies and external ENHANCED use registry rules.
+  dynamic "image_scanning_configuration" {
+    for_each = !var.manage_ecr_registry_scanning && var.ecr_scan_type == "BASIC" ? [1] : []
+    content {
+      scan_on_push = true
+    }
+  }
   encryption_configuration { encryption_type = "AES256" }
 }
 resource "aws_ecr_lifecycle_policy" "app" {

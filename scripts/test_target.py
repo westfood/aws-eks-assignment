@@ -1,6 +1,7 @@
 """Account and state isolation tests; every external command is mocked."""
 
 from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime, timezone
 import importlib.util
 import io
 import json
@@ -72,11 +73,13 @@ class FakeCommands:
 
     def __init__(self, target):
         self.account = target.account
+        self.target = target
         self.outputs = outputs_for(target)
         self.calls = []
         self.fail_bucket = False
         self.fail_plan = False
         self.fail_apply = False
+        self.fail_scan = False
         self.kube_document = {
             "contexts": [{"name": target.name, "context": {"cluster": "selected-cluster", "user": "selected-user"}}],
             "clusters": [{"name": "selected-cluster", "cluster": {
@@ -97,6 +100,26 @@ class FakeCommands:
             if "get-login-password" in command:
                 print("synthetic-login-token")
                 return None
+            if "get-registry-scanning-configuration" in command:
+                return json.dumps({"registryId": self.account,
+                                   "scanningConfiguration": {"scanType": self.target.infra.get("ecr_scan_type", "BASIC")}})
+            if "batch-get-repository-scanning-configuration" in command:
+                repository = self.outputs["ecr_repository_url"]["value"].split("/", 1)[1]
+                return json.dumps({"scanningConfigurations": [{
+                    "repositoryName": repository,
+                    "repositoryArn": f"arn:aws:ecr:{self.target.region}:{self.account}:repository/{repository}",
+                    "scanFrequency": "CONTINUOUS_SCAN" if self.target.infra.get("ecr_scan_type") == "ENHANCED" else "SCAN_ON_PUSH",
+                }]})
+            if "describe-image-scan-findings" in command:
+                request = json.loads(command[command.index("--cli-input-json") + 1])
+                enhanced = self.target.infra.get("ecr_scan_type") == "ENHANCED"
+                return json.dumps({"registryId": self.account, "repositoryName": request["repositoryName"],
+                    "imageId": request["imageId"], "imageScanStatus": {"status": "ACTIVE" if enhanced else "COMPLETE"},
+                    "imageScanFindings": {
+                        "imageScanCompletedAt": datetime.now(timezone.utc).isoformat(),
+                        "findingSeverityCounts": {"HIGH": 1} if self.fail_scan else {},
+                        "enhancedFindings" if enhanced else "findings": [],
+                    }})
         if command[0] == "terraform":
             if "plan" in command:
                 if self.fail_plan:
@@ -320,15 +343,86 @@ class EnvironmentTargetTests(unittest.TestCase):
         image = values["ecr_repository_url"]["value"] + "@sha256:" + "a" * 64
         with self.assertRaisesRegex(ValueError, "this target account"):
             selected.platform_inputs(image.replace(selected.account, ACCOUNTS["prod"]))
-        selected.platform_inputs(image)
+        fake = FakeCommands(selected)
+        with patch.object(selected, "run", side_effect=fake):
+            selected.platform_inputs(image)
         path = selected.directory / "inputs" / "platform.tfvars.json"
         inputs = json.loads(path.read_text())
         self.assertEqual(inputs["environment"], "dev")
         self.assertEqual(inputs["aws_account_id"], selected.account)
         self.assertEqual(inputs["app_image"], image)
         self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
-        with self.assertRaisesRegex(ValueError, "Refusing to replace"):
+        with patch.object(selected, "run", side_effect=fake):
+            with self.assertRaisesRegex(ValueError, "Refusing to replace"):
+                selected.platform_inputs(image)
+
+    def platform_fixture(self):
+        selected = self.target()
+        self.write_outputs(selected)
+        image = outputs_for(selected)["ecr_repository_url"]["value"] + "@sha256:" + "a" * 64
+        fake = FakeCommands(selected)
+        with patch.object(selected, "run", side_effect=fake):
             selected.platform_inputs(image)
+        fake.calls.clear()
+        return selected, image, fake
+
+    def test_image_gate_failure_prevents_platform_input_creation(self):
+        selected = self.target()
+        self.write_outputs(selected)
+        image = outputs_for(selected)["ecr_repository_url"]["value"] + "@sha256:" + "a" * 64
+        fake = FakeCommands(selected)
+        fake.fail_scan = True
+        with patch.object(selected, "run", side_effect=fake):
+            with self.assertRaisesRegex(ValueError, "1 HIGH"):
+                selected.platform_inputs(image)
+        self.assertFalse((selected.directory / "inputs" / "platform.tfvars.json").exists())
+
+    def test_platform_plan_rechecks_security_before_any_terraform_plan(self):
+        selected, _, fake = self.platform_fixture()
+        fake.fail_scan = True
+        with patch.object(selected, "run", side_effect=fake):
+            with self.assertRaisesRegex(ValueError, "1 HIGH"):
+                selected.terraform("platform", "plan")
+        self.assertFalse(any(command[0] == "terraform" for command, _, _ in fake.calls))
+        self.assertFalse((selected.directory / "plans" / "platform.json").exists())
+
+    def test_platform_apply_rechecks_findings_after_successful_plan(self):
+        selected, _, fake = self.platform_fixture()
+        with patch.object(selected, "run", side_effect=fake):
+            selected.terraform("platform", "plan")
+            fake.fail_scan = True
+            with self.assertRaisesRegex(ValueError, "1 HIGH"):
+                selected.terraform("platform", "apply")
+        scans = [command for command, _, _ in fake.calls if "describe-image-scan-findings" in command]
+        self.assertEqual(len(scans), 2, "Apply must re-read ECR; plan evidence cannot authorize a later release")
+        self.assertFalse(any(command[0] == "terraform" and "apply" in command for command, _, _ in fake.calls))
+
+    def test_destroy_remains_possible_when_image_is_vulnerable_or_unavailable(self):
+        selected, _, fake = self.platform_fixture()
+        for ingress_only in (False, True):
+            fake.calls.clear()
+            fake.fail_scan = True
+            with self.subTest(ingress_only=ingress_only), patch.object(selected, "run", side_effect=fake), \
+                    patch.object(selected, "scan_image", side_effect=AssertionError("Teardown must not depend on ECR")) as scanner:
+                selected.terraform("platform", "plan", destroy=True, ingress_only=ingress_only)
+                selected.terraform("platform", "apply", destroy=True, ingress_only=ingress_only)
+                scanner.assert_not_called()
+            self.assertTrue(any(command[0] == "terraform" and "apply" in command for command, _, _ in fake.calls))
+
+    def test_scan_command_checks_account_before_reading_ecr(self):
+        selected, image, fake = self.platform_fixture()
+        fake.account = ACCOUNTS["prod"]
+        with patch.object(selected, "run", side_effect=fake):
+            with self.assertRaisesRegex(ValueError, "Credential account mismatch"):
+                selected.scan_image(image)
+        self.assertEqual(len(fake.calls), 1)
+        self.assertIn("get-caller-identity", fake.calls[0][0])
+
+    def test_cli_scan_image_forwards_explicit_digest_and_wait(self):
+        with patch.object(targeting, "Target") as constructor:
+            image = "123456789012.dkr.ecr.eu-central-1.amazonaws.com/contoso-dev-app@sha256:" + "a" * 64
+            self.assertEqual(targeting.main(["--env", "dev", "scan-image", "--image", image, "--wait-seconds", "0"]), 0)
+            constructor.return_value.scan_image.assert_called_once_with(image, 0)
 
     def test_mixed_platform_inputs_are_rejected_before_backend_access(self):
         selected = self.target()

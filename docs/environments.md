@@ -55,10 +55,14 @@ The account ID must be a real 12-digit value before cloud commands run, and the 
 | Resource base name | `contoso` → `contoso-dev` | `contoso` → `contoso-test` / `contoso-prod` |
 | NAT | Single gateway for demo cost | One gateway per AZ |
 | RDS | Single-AZ | Multi-AZ |
+| ECR scanning | Basic scan on push | Inspector enhanced continuous scanning |
+| ECR registry ownership | Enabled in the dedicated assignment account | Enabled in each dedicated assignment account |
 | EKS API | Private path plus CIDR-restricted public API | Same explicit management path; private-only is optional when connected access exists |
 | Application | Synthetic interview demo | Shared sample; requires production review before real users/data |
 
 These are configuration choices, not evidence that test/prod have been deployed or approved for production use.
+
+`infra.ecr_scan_type` sets the minimum release policy. Enhanced adds language-package coverage and Inspector charges. `infra.manage_ecr_registry_scanning=true` owns a **single account/Region-wide policy**, not just this repository: it replaces rules, Enhanced unmatched repositories have scanning Off, and destroy resets the registry to Basic with no rules. The Terraform variable defaults to `false`; keep it disabled when an existing registry is centrally managed and arrange the required coverage with its owner. See [image security](image-security.md).
 
 ## Run commands against a target
 
@@ -75,7 +79,8 @@ mise run target -- --env dev check
 | --- | --- |
 | `terraform bootstrap init`, `plan`, `apply`, `output` | Create the selected account's state bucket |
 | `terraform infra init`, `plan`, `apply`, `output` | Manage selected AWS infrastructure |
-| `platform-inputs --image repository@sha256:...` | Generate platform inputs from this target's infra outputs |
+| `scan-image --image repository@sha256:...` | Check this target's actual ECR scan coverage and digest findings |
+| `platform-inputs --image repository@sha256:...` | Check image policy and generate inputs from this target's infra outputs |
 | `terraform platform init`, `plan`, `apply`, `output` | Manage selected Helm/Kubernetes resources |
 | `aws <arguments>` | Run an AWS CLI operation under the selected account/profile/Region |
 | `kubeconfig` | Write the target's dedicated EKS kubeconfig |
@@ -94,6 +99,8 @@ mise run demo
 
 Each target uses `.local/<environment>/` for generated inputs, backend configuration, Terraform initialization data and saved plans. Managed output files are `bootstrap-outputs.json`, `infra-outputs.json` and `platform-outputs.json` within that directory. The `terraform ... output` helper command writes these files; do not redirect its output over the same managed file.
 
+Image scan decision reports are private files under `.local/<environment>/image-scans/`, named by digest. They record a decision, not a reusable release authorization: platform input generation and normal platform plan/apply each query AWS again. Destroy operations skip image scans.
+
 The dedicated kubeconfigs are `.local/dev/kubeconfig`, `.local/test/kubeconfig` and `.local/prod/kubeconfig`. Existing lab contexts in the normal kubeconfig are preserved. Terraform backend keys and the local bootstrap state are separate for each target, and account restrictions apply to both providers and remote state access. The helper checks the expected S3 bucket owner before remote-backend operations.
 
 Plan/apply commands use target-specific saved-plan manifests. Select the same account/environment, stage and destroy mode for apply; changing inputs requires a fresh plan. For example:
@@ -108,6 +115,8 @@ An infrastructure change in test or prod uses its own account, configuration, pl
 ## Promote a change
 
 Use the same reviewed source revision and immutable image version across environments. Build and exercise the change in dev, validate it in test, then create and review a separate prod plan using the prod account and state. Copying a plan or state file between targets is not a promotion mechanism. A plan belongs to its environment and state.
+
+Publish or copy the reviewed image into the selected account's ECR repository, then use its executable platform-manifest digest. Each target verifies its own repository and current scan evidence; dev's scan report does not authorize a test/prod release. The sample helper rejects another environment's ECR URL.
 
 The test/prod configuration examples demonstrate environment-specific choices. Their presence is not a claim that the sample application is production-ready. Before real production use, define recovery and availability objectives, add application authentication, configure verified HTTPS and owned DNS, establish operational alerts, test restores and review deployment permissions. The demonstration application accepts synthetic messages without end-user authentication.
 

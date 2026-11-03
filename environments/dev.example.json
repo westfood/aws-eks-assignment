@@ -23,6 +23,8 @@
     "db_deletion_protection": true,
     "db_skip_final_snapshot": false,
     "enable_waf": true,
-    "private_only_api": false
+    "private_only_api": false,
+    "manage_ecr_registry_scanning": true,
+    "ecr_scan_type": "BASIC"
   }
 }

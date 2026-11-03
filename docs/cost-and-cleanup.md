@@ -22,6 +22,7 @@ Prepare an [AWS Pricing Calculator estimate](https://calculator.aws/) using the 
 | WAF | Enabled ACL, rules and request volume | ACL/rule charges and inspected requests |
 | Secrets Manager | RDS-managed master secret | Secret storage and API usage |
 | CloudWatch/ECR/S3 | Logs, application image and Terraform state | Storage, requests, scanning/features and transfer as configured |
+| Inspector enhanced ECR scanning | Enabled by the test/prod example scanning policy | Initial scans and applicable re-scans; optional CI Scan API usage is separate |
 | Data transfer | Cross-AZ egress, client traffic and image pulls | Applicable transfer charges |
 
 See [VPC/NAT/IPv4](https://aws.amazon.com/vpc/pricing/), [RDS PostgreSQL](https://aws.amazon.com/rds/postgresql/pricing/), [ALB](https://aws.amazon.com/elasticloadbalancing/pricing/), and [WAF pricing](https://aws.amazon.com/waf/pricing/) for the corresponding meters.
@@ -30,6 +31,8 @@ The dev demo reduces resource count with a single NAT Gateway and Single-AZ DB; 
 
 Use an AWS Budget and billing alerts when the account is ready. Budgets notify; they are not a hard spending cap. Keep the account's billing access and root-user security setup separate from the application deployment. Check account-credit terms rather than assuming that a particular service is covered.
 
+Dev's ECR Basic scanning has no additional scan charge, while ordinary repository storage/transfer charges remain. Test/prod examples enable paid Inspector enhanced continuous scanning. Re-scan eligibility and retention settings affect usage: review them before retaining images. Optional GuardDuty Runtime Monitoring and Security Hub CSPM also need a separate cost/scope decision; they are not enabled here. [Basic scanning cost](https://aws.amazon.com/about-aws/whats-new/2024/08/new-version-amazon-ecr-basic-scanning/), [Inspector pricing](https://aws.amazon.com/inspector/pricing/), [GuardDuty pricing](https://aws.amazon.com/guardduty/pricing/), [Security Hub pricing](https://aws.amazon.com/security-hub/pricing/)
+
 ## Teardown order
 
 Select the environment explicitly for every cleanup operation. Confirm its account and plan before deletion; dev cleanup must leave test and prod state and resources untouched. Use the environment-targeted commands in the root README and [environment guide](environments.md).
@@ -37,7 +40,7 @@ Select the environment explicitly for every cleanup operation. Confirm its accou
 1. Remove the Terraform-managed Ingress while AWS Load Balancer Controller is healthy. Wait for the ALB, target groups and related controller-managed resources to be deleted. The Ingress finalizer should finish while the controller can still call AWS APIs.
 2. Destroy the remaining `platform/` resources, including the controller and Kubernetes workloads.
 3. Review the database retention decision. The default keeps deletion protection enabled and requires a final snapshot. Set `infra.db_deletion_protection` to `false` in the selected environment JSON file, review the plan and apply that change before destroying the DB. Keep `db_skip_final_snapshot = false` when retaining data; set it to `true` only for deliberately disposable synthetic data. Supply `infra.db_final_snapshot_identifier` with a unique name for this run so it cannot collide with a snapshot from an earlier demo. Set the retention inputs in the selected private environment JSON file so that the same values reach both teardown plans. Record retained snapshot identifiers privately.
-4. Destroy `infra/`. Check for remaining ALBs, target groups, ENIs, NAT Gateways, EIPs, EBS volumes, DB instances, snapshots, secrets and CloudWatch logs in the selected Region. Investigate dependencies rather than repeatedly forcing deletion.
+4. Review/delete the intended ECR image digests before destroying `infra/`; the repository has `force_delete=false`. Delete a parent manifest index before referenced child images, then review remaining provenance artifacts and other images. Destroying a managed ECR registry scanning configuration resets the entire account/Region to Basic with no rules, rather than restoring an earlier policy. Do not use this state to own a shared policy without coordinating its lifecycle. Platform destroy operations skip the scan gate, so expired findings cannot block teardown. Check for remaining ALBs, target groups, ENIs, NAT Gateways, EIPs, EBS volumes, DB instances, snapshots, secrets and CloudWatch logs in the selected Region. Investigate dependencies rather than repeatedly forcing deletion.
 5. Keep the state bucket until infrastructure deletion is complete and the state is backed up. Its version history can contain sensitive infrastructure data. Bucket versioning means deleting current objects does not remove old versions or delete markers.
 6. Treat retained RDS snapshots, ECR images, logs, Secrets Manager retention and the state bucket as explicit retained resources. They can continue to incur charges.
 

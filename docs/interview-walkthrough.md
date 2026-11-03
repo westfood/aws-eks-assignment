@@ -24,7 +24,7 @@ Show [the architecture](architecture.md) and identify the two AZs, three subnet 
 
 1. `bootstrap/` creates the protected state bucket.
 2. `infra/` creates AWS networking, the EKS cluster and nodes, RDS and IAM roles.
-3. Build the application image and push it to the repository used by the deployment.
+3. Build the application image, push it to the selected account's ECR repository and check the exact platform-manifest digest for blocking vulnerabilities.
 4. `platform/` installs the controller and application resources. A separate Job initializes database privileges and schema.
 5. The controller reconciles the Ingress into an ALB and registers healthy Pod IP targets.
 
@@ -64,8 +64,25 @@ Explain the alternatives: an internal ALB for internal users, a public ALB for a
 - **Shield Standard:** baseline AWS DDoS protection; Shield Advanced is a separate paid choice.
 - **Security groups and private subnets:** limit network exposure between tiers.
 - **IRSA and SQL grants:** limit application identity and database operations.
+- **ECR scanning and digest pinning:** block releases with High/Critical findings or incomplete evidence and deploy the checked artifact. Dev demonstrates Basic OS scanning; test/prod request paid Inspector continuous coverage for OS and Python packages.
 - **Application authorization:** required for real users and real data; synthetic demonstration messages are not an authenticated product.
 - **Logs, alerts, updates and backups:** necessary operational controls beyond the request path.
+
+## Explain image security
+
+"We separate artifact identity, known-vulnerability checks and runtime restrictions. The image is pinned by digest; ECR scanning checks that exact artifact. Our release helper reads current results before input generation, plan and apply, blocking High/Critical findings and unavailable evidence. The container runs as a non-root user with a read-only filesystem and restricted capabilities. These controls address different risks."
+
+After a live ECR push, demonstrate the decision without printing credentials:
+
+```bash
+mise run target -- --env dev scan-image --image "$APP_IMAGE"
+```
+
+Explain that Basic covers OS packages, while Inspector Enhanced also covers language dependencies such as Python packages. On-push scans have an explicit 24-hour evidence age policy here. Continuous Inspector coverage requires `ACTIVE` status and reacts to relevant new CVEs, so an old initial completion timestamp alone does not mean its current findings are stale. Retain the private digest report as evidence of the decision, and rebuild/patch to a new digest when blocked.
+
+The registry scanning policy is shared by all repositories in an account/Region; this Terraform state should own it only in dedicated assignment accounts or as its established central owner. Mention that unmatched Enhanced repositories have scanning Off and destroying the managed policy resets Basic/no rules.
+
+For further controls, propose ECR managed signing with AWS Signer **and** EKS admission verification, GuardDuty Runtime Monitoring for suspicious running behavior, and Inspector findings routed through Security Hub CSPM/EventBridge. These are recommendations, not deployed features. Restrict deployment IAM/RBAC and enforce admission policy for production: a workstation helper can be bypassed by an administrator. See [image security](image-security.md) for scope, costs and sources.
 
 ## Explain a change and teardown
 
@@ -79,6 +96,8 @@ For teardown, remove the application Ingress while the ALB controller is still r
 | --- | --- | --- |
 | Formatting/schema validation | Terraform can parse configuration against installed provider schemas | AWS authorization or service behavior |
 | Mocked Terraform tests | Asserted desired-state relationships and invalid-input rejection | A real plan, routing, quotas or actual cloud resources |
+| Offline image-gate tests | Rejection/acceptance logic for synthetic scan responses and release hooks | Actual ECR/Inspector coverage or a clean live application image |
+| Live digest scan decision | Current returned findings passed the configured release policy | No malware, application vulnerabilities or future CVEs |
 | Local app/PostgreSQL test | Application read/write behavior and local error handling | RDS IAM authentication, RDS TLS, security groups or ALB behavior |
 | EKS/RDS live acceptance checks | Observed behavior of the deployed resources at the recorded revision | Future reliability, all possible attack paths or disaster recovery |
 

@@ -206,6 +206,12 @@ class Target:
         self.check_account()
         if stage != "bootstrap":
             self.check_bucket()
+        # Re-read ECR at release time: a clean report from input generation can
+        # become outdated before plan/apply. Teardown must remain possible even
+        # when an image is vulnerable, unscannable, or has been deleted.
+        if stage == "platform" and action in ("plan", "apply") and not destroy:
+            image = json.loads(inputs.read_text()).get("app_image")
+            self.scan_image(image, account_checked=True)
         command = ["terraform", f"-chdir={stage}"]
         if action == "init":
             self.run(command + ["init", "-input=false", "-reconfigure", "-lockfile=readonly", f"-backend-config={backend}"], stage=stage)
@@ -277,9 +283,16 @@ class Target:
             raise ValueError("Push/promote the image into this target account's ECR repository first")
         helper = load_helper("platform-inputs.py", "target_platform_inputs")
         value = helper.build_inputs(outputs, image, ingress_cidrs)
+        self.scan_image(image)
         path = self.directory / "inputs" / "platform.tfvars.json"
         helper.write_private(path, value, overwrite=overwrite)
         print(f"Wrote {path}", file=sys.stderr)
+
+    def scan_image(self, image, wait_seconds=300, account_checked=False):
+        if not account_checked:
+            self.check_account()
+        helper = load_helper("image-security.py", "target_image_security")
+        return helper.check_image(self, image, wait_seconds=wait_seconds)
 
     def demo(self):
         if self.environment != "dev":
@@ -311,6 +324,9 @@ def main(argv=None):
     platform.add_argument("--image", required=True)
     platform.add_argument("--ingress-cidr", action="append", dest="ingress_cidrs")
     platform.add_argument("--overwrite", action="store_true")
+    scan = commands.add_parser("scan-image")
+    scan.add_argument("--image", required=True, help="Selected ECR repository@sha256:digest")
+    scan.add_argument("--wait-seconds", type=int, default=300, help="Wait for an initial scan (default: 300 seconds)")
     args, forwarded = parser.parse_known_args(argv)
     if args.command in ("aws", "kubectl"):
         args.arguments = forwarded
@@ -334,6 +350,8 @@ def main(argv=None):
             target.create_kubeconfig()
         elif args.command == "platform-inputs":
             target.platform_inputs(args.image, args.ingress_cidrs, args.overwrite)
+        elif args.command == "scan-image":
+            target.scan_image(args.image, args.wait_seconds)
         elif args.command == "demo":
             target.demo()
     except (ValueError, OSError, KeyError) as error:

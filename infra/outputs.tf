@@ -17,6 +17,19 @@ output "bootstrap_role_arn" { value = aws_iam_role.irsa["bootstrap"].arn }
 output "controller_role_arn" { value = aws_iam_role.irsa["controller"].arn }
 output "waf_acl_arn" { value = var.enable_waf ? aws_wafv2_web_acl.main[0].arn : "" }
 output "ecr_repository_url" { value = aws_ecr_repository.app.repository_url }
+output "ecr_repository_name" { value = aws_ecr_repository.app.name }
+output "ecr_scan_type" {
+  description = "Requested scan mode. When ecr_registry_scanning_managed is false, verify the externally managed registry policy before publishing images."
+  value       = var.ecr_scan_type
+}
+output "ecr_registry_scanning_managed" {
+  description = "Whether this state owns the account/Region ECR registry scanning configuration."
+  value       = var.manage_ecr_registry_scanning
+}
+output "ecr_scan_frequency" {
+  description = "Requested scan frequency for the app repository prefix; externally managed registry settings must be checked separately."
+  value       = local.ecr_scan_frequency
+}
 output "admin_cidrs" { value = var.admin_cidrs }
 output "resolved_postgres_version" { value = data.aws_rds_engine_version.postgres.version }
 output "resolved_addon_versions" {
