@@ -1,0 +1,52 @@
+flowchart TB
+    browser["Browser: frontend and JSON API"]
+    operator["Administrator: Terraform, AWS identity and kubeconfig"]
+    controlPlane["AWS-managed EKS control plane"]
+    appIdentity["IRSA application role: rds-db:connect only"]
+    bootstrapIdentity["Separate IRSA initialization role"]
+    masterSecret["Secrets Manager: RDS-managed master secret"]
+    proposedFrontend["Proposed alternative: CloudFront and private S3 frontend"]
+
+    subgraph vpc["One VPC across two Availability Zones"]
+        subgraph azA["Availability Zone A"]
+            subgraph publicA["Public ingress subnet A"]
+                natGateway["Single NAT Gateway: demo egress"]
+            end
+            subgraph computeA["Private compute subnet A"]
+                appA["EKS worker and frontend/API Pod: sample placement"]
+                bootstrapJob["One-time database initialization Job"]
+            end
+            subgraph databaseA["Isolated database subnet A"]
+                postgres["RDS PostgreSQL: Single-AZ demo instance"]
+            end
+        end
+
+        subgraph azB["Availability Zone B"]
+            publicB["Public ingress subnet B"]
+            subgraph computeB["Private compute subnet B"]
+                appB["EKS worker and frontend/API Pod: sample placement"]
+            end
+            databaseB["Isolated database subnet B: DB subnet group member, no demo standby"]
+        end
+
+        alb["Internet-facing ALB across public subnets A and B"]
+        waf["Regional WAF association: enabled by default, configurable"]
+    end
+
+    browser -->|"HTTP 80 restricted to client CIDRs, or HTTPS 443 with owned DNS and ACM"| alb
+    waf -. "Request filtering" .-> alb
+    alb -->|"HTTP 8080, Pod IP targets"| appA
+    alb -->|"HTTP 8080, Pod IP targets"| appB
+    appA -->|"PostgreSQL 5432, verified TLS"| postgres
+    appB -->|"PostgreSQL 5432, verified TLS"| postgres
+    appA -->|"Outbound image pulls and AWS APIs"| natGateway
+    appB -->|"Outbound image pulls and AWS APIs"| natGateway
+    operator -->|"Restricted public API CIDRs, IAM and RBAC"| controlPlane
+    controlPlane -. "Private API path within VPC" .-> appA
+    controlPlane -. "Private API path within VPC" .-> appB
+    appIdentity -. "Temporary application identity" .-> appA
+    appIdentity -. "Temporary application identity" .-> appB
+    bootstrapIdentity -. "Initialization identity" .-> bootstrapJob
+    bootstrapJob -->|"GetSecretValue over HTTPS"| masterSecret
+    bootstrapJob -->|"Admin TLS connection, create restricted app user and schema"| postgres
+    proposedFrontend -. "Future design, not deployed by this demo" .-> browser

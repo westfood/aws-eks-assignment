@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2160" height="1360" viewBox="0 0 2160 1360">
+<title>Contoso AWS DevOps demonstration architecture</title>
+<desc>A two-Availability-Zone VPC with public ALB subnets, private EKS compute subnets and isolated RDS subnets. The diagram labels the Single-AZ database, shared NAT, conditional HTTPS and proposed static frontend explicitly.</desc>
+<defs>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#14669b"/></marker>
+  <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8653a4"/></marker>
+  <marker id="arrowGrey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#52677a"/></marker>
+</defs>
+<style>
+text { font-family: Arial, Helvetica, sans-serif; fill: #182c40; }
+.title { font-size: 34px; font-weight: 700; }
+.subtitle { font-size: 19px; fill: #52677a; }
+.section { font-size: 22px; font-weight: 700; }
+.label { font-size: 20px; font-weight: 700; }
+.body { font-size: 18px; }
+.small { font-size: 16px; fill: #52677a; }
+.tiny { font-size: 15px; fill: #52677a; }
+</style>
+<rect width="2160" height="1360" fill="#f7fafc"/>
+
+<text x="48" y="60" class="title" text-anchor="start">Contoso application platform</text>
+<text x="48" y="98" class="subtitle" text-anchor="start">Terraform design • Two-AZ network • Private compute and database • Live AWS verification still required</text>
+<rect x="350" y="175" width="1420" height="940" rx="18" fill="#ffffff" stroke="#14669b" stroke-width="2"/>
+<text x="375" y="210" class="section" text-anchor="start" style="fill:#14669b">VPC</text>
+<text x="1738" y="210" class="small" text-anchor="end">EKS nodes and RDS have private addresses</text>
+<rect x="380" y="235" width="650" height="825" rx="12" fill="#ffffff" stroke="#b9c8d3" stroke-width="2" stroke-dasharray="8 6"/>
+<rect x="1080" y="235" width="650" height="825" rx="12" fill="#ffffff" stroke="#b9c8d3" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="405" y="267" class="section" text-anchor="start">Availability Zone A</text>
+<text x="1105" y="267" class="section" text-anchor="start">Availability Zone B</text>
+<rect x="400" y="285" width="610" height="180" rx="12" fill="#e9f4fc" stroke="#b9c8d3" stroke-width="2"/>
+<rect x="400" y="495" width="610" height="250" rx="12" fill="#eaf5ef" stroke="#b9c8d3" stroke-width="2"/>
+<rect x="400" y="775" width="610" height="240" rx="12" fill="#f0eef9" stroke="#b9c8d3" stroke-width="2"/>
+<text x="418" y="312" class="small" text-anchor="start">PUBLIC SUBNET A</text>
+<text x="418" y="525" class="small" text-anchor="start">PRIVATE COMPUTE SUBNET A</text>
+<text x="418" y="805" class="small" text-anchor="start">ISOLATED DATABASE SUBNET A</text>
+<rect x="1100" y="285" width="610" height="180" rx="12" fill="#e9f4fc" stroke="#b9c8d3" stroke-width="2"/>
+<rect x="1100" y="495" width="610" height="250" rx="12" fill="#eaf5ef" stroke="#b9c8d3" stroke-width="2"/>
+<rect x="1100" y="775" width="610" height="240" rx="12" fill="#f0eef9" stroke="#b9c8d3" stroke-width="2"/>
+<text x="1118" y="312" class="small" text-anchor="start">PUBLIC SUBNET B</text>
+<text x="1118" y="525" class="small" text-anchor="start">PRIVATE COMPUTE SUBNET B</text>
+<text x="1118" y="805" class="small" text-anchor="start">ISOLATED DATABASE SUBNET B</text>
+<rect x="48" y="285" width="230" height="112" rx="12" fill="#ffffff" stroke="#14669b" stroke-width="2"/>
+<text x="163" y="323" class="label" text-anchor="middle">Browser</text>
+<text x="163" y="353" class="small" text-anchor="middle">Frontend + JSON API</text>
+<text x="163" y="377" class="small" text-anchor="middle">Synthetic demo data</text>
+<path d="M 278 340 H 750" fill="none" stroke="#14669b" stroke-width="3" stroke-linejoin="round" marker-end="url(#arrowBlue)"/>
+<text x="50" y="430" class="tiny" text-anchor="start">HTTP 80: explicit client CIDRs</text>
+<text x="50" y="454" class="tiny" text-anchor="start">HTTPS 443: owned domain</text>
+<text x="50" y="478" class="tiny" text-anchor="start">and ACM certificate</text>
+<rect x="755" y="325" width="640" height="85" rx="12" fill="#ffffff" stroke="#14669b" stroke-width="2"/>
+<text x="1075" y="357" class="label" text-anchor="middle">Internet-facing ALB</text>
+<text x="1075" y="387" class="small" text-anchor="middle">WAF managed rules + rate limit (configurable)</text>
+<text x="1413" y="355" class="tiny" text-anchor="start">Spans both</text>
+<text x="1413" y="377" class="tiny" text-anchor="start">public subnets</text>
+<rect x="435" y="365" width="265" height="70" rx="12" fill="#ffffff" stroke="#8653a4" stroke-width="2"/>
+<text x="567" y="393" class="label" text-anchor="middle">NAT Gateway</text>
+<text x="567" y="419" class="tiny" text-anchor="middle">Single-AZ demo egress</text>
+<rect x="440" y="555" width="510" height="135" rx="12" fill="#ffffff" stroke="#23775d" stroke-width="2"/>
+<text x="695" y="590" class="label" text-anchor="middle">EKS worker + application Pod</text>
+<text x="695" y="621" class="body" text-anchor="middle">Frontend and API share the deployment</text>
+<text x="695" y="652" class="small" text-anchor="middle">Private IP • HTTP 8080 • /readyz health check</text>
+<rect x="1140" y="555" width="510" height="135" rx="12" fill="#ffffff" stroke="#23775d" stroke-width="2"/>
+<text x="1395" y="590" class="label" text-anchor="middle">EKS worker + application Pod</text>
+<text x="1395" y="621" class="body" text-anchor="middle">Frontend and API share the deployment</text>
+<text x="1395" y="652" class="small" text-anchor="middle">Private IP • HTTP 8080 • /readyz health check</text>
+<text x="705" y="724" class="tiny" text-anchor="middle">Node group spans compute subnets; Pod placement is illustrative</text>
+<text x="1405" y="724" class="tiny" text-anchor="middle">No public node IP addresses</text>
+<path d="M 960 410 V 478 H 695 V 550" fill="none" stroke="#14669b" stroke-width="3" stroke-linejoin="round" marker-end="url(#arrowBlue)"/>
+<path d="M 1190 410 V 478 H 1395 V 550" fill="none" stroke="#14669b" stroke-width="3" stroke-linejoin="round" marker-end="url(#arrowBlue)"/>
+<text x="1080" y="452" class="small" text-anchor="middle">HTTP 8080 to Pod IP targets</text>
+<rect x="440" y="840" width="510" height="125" rx="12" fill="#ffffff" stroke="#8653a4" stroke-width="2"/>
+<text x="695" y="875" class="label" text-anchor="middle">RDS PostgreSQL</text>
+<text x="695" y="907" class="body" text-anchor="middle">Single-AZ demo instance</text>
+<text x="695" y="939" class="small" text-anchor="middle">DB SG: EKS node SG → TCP 5432 only</text>
+<rect x="1140" y="840" width="510" height="125" rx="12" fill="#fbfaff" stroke="#b9c8d3" stroke-width="2" stroke-dasharray="7 6"/>
+<text x="1395" y="880" class="label" text-anchor="middle">DB subnet group member</text>
+<text x="1395" y="914" class="small" text-anchor="middle">No standby in the Single-AZ demo</text>
+<text x="1395" y="940" class="small" text-anchor="middle">No internet or NAT default route</text>
+<path d="M 695 690 V 835" fill="none" stroke="#14669b" stroke-width="3" stroke-linejoin="round" marker-end="url(#arrowBlue)"/>
+<text x="715" y="774" class="small" text-anchor="start">TCP 5432 + verified TLS</text>
+<path d="M 1395 690 V 758 H 990 V 902 H 955" fill="none" stroke="#14669b" stroke-width="3" stroke-linejoin="round" marker-end="url(#arrowBlue)"/>
+<text x="1080" y="1038" class="small" text-anchor="middle">Application IAM login and SQL grants are additional controls</text>
+<path d="M 440 628 H 418 V 435 H 455" fill="none" stroke="#8653a4" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrowPurple)"/>
+<path d="M 1650 628 H 1688 V 478 H 680 V 440" fill="none" stroke="#8653a4" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrowPurple)"/>
+<text x="487" y="487" class="tiny" text-anchor="start" style="fill:#8653a4">Outbound image pulls / AWS APIs</text>
+<rect x="48" y="520" width="230" height="195" rx="12" fill="#ffffff" stroke="#b9c8d3" stroke-width="2"/>
+<text x="68" y="554" class="label" text-anchor="start">Administrator</text>
+<text x="68" y="589" class="small" text-anchor="start">Terraform roots</text>
+<text x="68" y="617" class="small" text-anchor="start">1  bootstrap: state</text>
+<text x="68" y="645" class="small" text-anchor="start">2  infra: AWS</text>
+<text x="68" y="673" class="small" text-anchor="start">3  platform: Helm/K8s</text>
+<text x="68" y="701" class="tiny" text-anchor="start">AWS identity + kubeconfig</text>
+<rect x="1810" y="250" width="302" height="190" rx="12" fill="#ffffff" stroke="#52677a" stroke-width="2" stroke-dasharray="7 6"/>
+<text x="1830" y="287" class="label" text-anchor="start">EKS control plane</text>
+<text x="1830" y="320" class="small" text-anchor="start">Managed by AWS</text>
+<text x="1830" y="345" class="small" text-anchor="start">Private API enabled</text>
+<text x="1830" y="370" class="small" text-anchor="start">Public API: admin CIDRs</text>
+<text x="1830" y="395" class="small" text-anchor="start">Private-only option needs</text>
+<text x="1830" y="420" class="small" text-anchor="start">a connected runner/network</text>
+<path d="M 48 600 H 24 V 150 H 1960 V 245" fill="none" stroke="#52677a" stroke-width="2" stroke-linejoin="round" stroke-dasharray="9 7" marker-end="url(#arrowGrey)"/>
+<text x="1190" y="143" class="tiny" text-anchor="middle">Management: Terraform, Helm and kubectl</text>
+<path d="M 1810 390 H 1750 V 585 H 1656" fill="none" stroke="#52677a" stroke-width="2" stroke-linejoin="round" stroke-dasharray="9 7" marker-end="url(#arrowGrey)"/>
+<text x="1700" y="475" class="tiny" text-anchor="middle">Private API</text>
+<rect x="1810" y="485" width="302" height="250" rx="12" fill="#ffffff" stroke="#b9c8d3" stroke-width="2"/>
+<text x="1830" y="523" class="label" text-anchor="start">Application identity</text>
+<text x="1830" y="561" class="small" text-anchor="start">Service account → IRSA</text>
+<text x="1830" y="586" class="small" text-anchor="start">Temporary AWS credentials</text>
+<text x="1830" y="611" class="small" text-anchor="start">rds-db:connect only</text>
+<text x="1830" y="636" class="small" text-anchor="start">for the app database user</text>
+<text x="1830" y="661" class="small" text-anchor="start"></text>
+<text x="1830" y="686" class="small" text-anchor="start">TLS: verify-full + RDS CA</text>
+<text x="1830" y="711" class="small" text-anchor="start">No master-secret access</text>
+<rect x="1810" y="775" width="302" height="240" rx="12" fill="#ffffff" stroke="#b9c8d3" stroke-width="2"/>
+<text x="1830" y="813" class="label" text-anchor="start">DB initialization</text>
+<text x="1830" y="851" class="small" text-anchor="start">Separate Job and IAM role</text>
+<text x="1830" y="875" class="small" text-anchor="start">Reads managed master</text>
+<text x="1830" y="899" class="small" text-anchor="start">secret from Secrets Manager</text>
+<text x="1830" y="923" class="small" text-anchor="start">Creates restricted app user</text>
+<text x="1830" y="947" class="small" text-anchor="start">and application schema</text>
+<text x="1830" y="971" class="small" text-anchor="start">Master-secret access is not</text>
+<text x="1830" y="995" class="small" text-anchor="start">granted to the serving role</text>
+<rect x="48" y="1160" width="1722" height="145" rx="12" fill="#ffffff" stroke="#b9c8d3" stroke-width="2"/>
+<text x="72" y="1195" class="label" text-anchor="start">How to read this diagram</text>
+<path d="M 75 1227 H 135" fill="none" stroke="#14669b" stroke-width="3" stroke-linejoin="round" marker-end="url(#arrowBlue)"/>
+<text x="152" y="1234" class="small" text-anchor="start">Application requests and database traffic</text>
+<path d="M 760 1227 H 820" fill="none" stroke="#8653a4" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrowPurple)"/>
+<text x="837" y="1234" class="small" text-anchor="start">Private-node outbound traffic through NAT</text>
+<path d="M 75 1270 H 135" fill="none" stroke="#52677a" stroke-width="2" stroke-linejoin="round" stroke-dasharray="9 7" marker-end="url(#arrowGrey)"/>
+<text x="152" y="1277" class="small" text-anchor="start">Management path; not the browser request path</text>
+<text x="837" y="1277" class="small" text-anchor="start">Two DB subnets do not imply a running standby</text>
+<rect x="1810" y="1060" width="302" height="245" rx="12" fill="#fff8ed" stroke="#9b621a" stroke-width="2" stroke-dasharray="7 6"/>
+<text x="1830" y="1098" class="label" text-anchor="start" style="fill:#9b621a">Production options</text>
+<text x="1830" y="1135" class="small" text-anchor="start">Proposed, not deployed here</text>
+<text x="1830" y="1160" class="small" text-anchor="start"></text>
+<text x="1830" y="1185" class="small" text-anchor="start">Private S3 + CloudFront</text>
+<text x="1830" y="1210" class="small" text-anchor="start">for a larger static frontend</text>
+<text x="1830" y="1235" class="small" text-anchor="start">Multi-AZ DB and AZ-local NAT</text>
+<text x="1830" y="1260" class="small" text-anchor="start">Application authentication</text>
+<text x="1830" y="1285" class="small" text-anchor="start">Owned DNS + verified HTTPS</text>
+</svg>

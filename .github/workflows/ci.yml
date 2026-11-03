@@ -1,0 +1,168 @@
+name: Validate assignment
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    name: Application and PostgreSQL integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # GitHub supplies the service-container engine. This job does not build an
+    # application image, contact AWS, or depend on the developer's Docker daemon.
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+        env:
+          POSTGRES_DB: contoso
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-disposable-admin-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d contoso"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      APP_ENV: local
+      DB_AUTH: password
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      DB_NAME: contoso
+      DB_USER: contoso_app
+      DB_PASSWORD: ci-disposable-app-only
+      DB_SSLMODE: disable
+      BOOTSTRAP_DB_USER: postgres
+      BOOTSTRAP_DB_PASSWORD: ci-disposable-admin-only
+      RUN_DB_INTEGRATION: "1"
+      AWS_EC2_METADATA_DISABLED: "true"
+    steps:
+      # Immutable action commits verified with the public GitHub API on 2026-11-03.
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: app/requirements.txt
+      - name: Install locked dependencies
+        run: python -m pip install --requirement app/requirements.txt
+      - name: Check dependency compatibility
+        run: python -m pip check
+      - name: Run deployment-helper unit tests
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Run unit and real PostgreSQL integration tests once
+        working-directory: app
+        run: python -m unittest discover -s tests -v
+
+  container-smoke:
+    name: Container image and Compose smoke test
+    needs: application
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build and start the isolated demo
+        run: docker compose up --build -d app
+      - name: Verify readiness and a real database round trip
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          import urllib.error
+          import urllib.request
+          import uuid
+
+          origin = "http://127.0.0.1:18080"
+          deadline = time.monotonic() + 120
+          while True:
+              try:
+                  with urllib.request.urlopen(origin + "/readyz", timeout=5) as response:
+                      assert response.status == 200
+                      assert json.load(response)["database"] == "connected"
+                  break
+              except (urllib.error.URLError, TimeoutError):
+                  if time.monotonic() >= deadline:
+                      raise RuntimeError("The container did not become database-ready") from None
+                  time.sleep(2)
+
+          body = "Disposable CI container smoke " + uuid.uuid4().hex
+          request = urllib.request.Request(
+              origin + "/api/messages",
+              data=json.dumps({"body": body}).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              assert response.status == 201
+              created = json.load(response)["message"]
+              assert created["body"] == body
+          with urllib.request.urlopen(origin + "/api/messages", timeout=10) as response:
+              assert any(row["id"] == created["id"] and row["body"] == body for row in json.load(response)["messages"])
+          with urllib.request.urlopen(origin + "/healthz", timeout=5) as response:
+              assert response.status == 200
+          print("Container image, bootstrap, readiness, PostgreSQL write/read and liveness passed.")
+          PY
+      - name: Verify the running container is unprivileged and read-only
+        shell: bash
+        run: |
+          test "$(docker compose exec -T app id -u)" = "10001"
+          container_id="$(docker compose ps -q app)"
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$container_id")" = "true"
+      - name: Show isolated container diagnostics on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Remove disposable CI containers and database volume
+        if: always()
+        run: docker compose down --volumes --remove-orphans
+
+  terraform:
+    name: Terraform (${{ matrix.root }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        root: [bootstrap, infra, platform]
+    defaults:
+      run:
+        working-directory: ${{ matrix.root }}
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      AWS_EC2_METADATA_DISABLED: "true"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: "1.14.8"
+          terraform_wrapper: false
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+      - name: Initialize providers without a remote backend
+        run: terraform init -backend=false -input=false -lockfile=readonly
+      - name: Validate configuration
+        run: terraform validate -no-color
+      - name: Run mocked provider tests without AWS credentials
+        run: terraform test -no-color

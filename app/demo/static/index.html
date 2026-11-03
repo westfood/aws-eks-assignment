@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Contoso · Application demo</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Contoso home"><span class="brand-mark" aria-hidden="true">C</span> Contoso</a>
+    <span class="header-label">AWS platform demonstration</span>
+  </header>
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">APPLICATION DEMO</p>
+      <h1 id="page-title">A message, saved.</h1>
+      <p class="lede">Write a short message to test the complete application and database path. Refresh the list to read it back.</p>
+      <div class="status-line" role="status" aria-live="polite">
+        <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+        <span id="database-status">Checking database connection…</span>
+        <span class="response-time" id="response-time"></span>
+      </div>
+    </section>
+    <div class="workspace">
+      <section class="panel compose-panel" aria-labelledby="compose-title">
+        <div class="panel-heading"><span class="step">01</span><h2 id="compose-title">Write a message</h2></div>
+        <form id="message-form">
+          <label for="message">Your demo message</label>
+          <textarea id="message" name="message" maxlength="512" rows="5" placeholder="Hello from the platform demo" required></textarea>
+          <div class="form-meta"><span>Saved in PostgreSQL</span><span id="character-count">0 / 512</span></div>
+          <button class="button primary" id="save-button" type="submit">Save message <span aria-hidden="true">↗</span></button>
+          <p class="form-feedback" id="form-feedback" role="status" aria-live="polite"></p>
+        </form>
+        <div class="explanation"><span class="small-label">WHAT THIS CHECKS</span><p>The frontend calls the application API. The API writes to the database, then reads the result back.</p><p>Use synthetic test messages only. Do not enter personal or confidential information.</p></div>
+      </section>
+      <section class="panel messages-panel" aria-labelledby="messages-title">
+        <div class="panel-heading message-heading"><div class="heading-group"><span class="step">02</span><h2 id="messages-title">Recent messages</h2></div><button class="button subtle" id="refresh-button" type="button">Refresh</button></div>
+        <p class="list-caption" id="list-caption">Loading saved messages…</p>
+        <div id="messages" class="message-list" aria-live="polite"></div>
+      </section>
+    </div>
+    <footer><span>Contoso</span><span>Infrastructure as code · Interview demonstration</span></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,67 @@
+# Isolated local application test. This does not emulate or validate AWS networking.
+name: orbit-assignment-local
+
+x-database: &database
+  APP_ENV: local
+  DB_AUTH: password
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: contoso
+  DB_USER: contoso_app
+  DB_PASSWORD: local-demo-only
+  DB_SSLMODE: disable
+
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    environment:
+      POSTGRES_DB: contoso
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: local-admin-only
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d contoso"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  bootstrap:
+    image: orbit-demo:local
+    build: ./app
+    command: ["python", "-m", "demo.bootstrap"]
+    environment:
+      <<: *database
+      BOOTSTRAP_DB_USER: postgres
+      BOOTSTRAP_DB_PASSWORD: local-admin-only
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+
+  app:
+    image: orbit-demo:local
+    build: ./app
+    environment: *database
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:18080:8080"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=6)"]
+      interval: 10s
+      timeout: 7s
+      retries: 6
+
+volumes:
+  postgres-data:
