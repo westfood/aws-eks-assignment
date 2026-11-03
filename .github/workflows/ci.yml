@@ -98,7 +98,10 @@ jobs:
                       assert response.status == 200
                       assert json.load(response)["database"] == "connected"
                   break
-              except (urllib.error.URLError, TimeoutError):
+              except OSError:
+                  # Docker may publish the port before Gunicorn is accepting
+                  # HTTP requests; a connection reset is a retryable startup
+                  # condition, just like connection refused or a timeout.
                   if time.monotonic() >= deadline:
                       raise RuntimeError("The container did not become database-ready") from None
                   time.sleep(2)
