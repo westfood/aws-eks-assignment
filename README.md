@@ -6,7 +6,7 @@ A small Terraform deployment for an AWS DevOps interview: a web frontend/API on 
 
 **Deployment status:** prepared without an AWS account. The container image and Compose database roundtrip passed in GitHub Actions. An AWS plan/apply, ECR push, ingress, RDS IAM/TLS checks and teardown must still be performed and recorded. CI does not establish live AWS behavior.
 
-Verification on **3 November 2026**: [all six CI jobs passed](https://github.com/westfood/aws-eks-assignment/actions/runs/41665535146) at commit `45b23f9`. They checked all seven mise-pinned tools on Linux, validated all three Terraform roots, ran 11 mocked Terraform checks, 23 application tests against PostgreSQL 17 and 6 helper tests, built the actual image, exercised Compose write/read, and checked UID `10001` and a read-only root filesystem. An isolated native PostgreSQL 18.6 instance and a real browser also exercised local desktop/mobile behavior. RDS IAM/TLS and AWS networking remain unverified.
+Verification on **3 November 2026**: [all six CI jobs passed](https://github.com/westfood/aws-eks-assignment/actions/runs/41670032344) at commit `f376333`. They checked all seven mise-pinned tools on Linux, validated all three Terraform roots, ran 28 mocked Terraform checks, 34 helper/account-targeting tests and 23 application tests against PostgreSQL 17, built the actual image, exercised Compose write/read, and checked UID `10001` and a read-only root filesystem. The environment guards were tested without AWS credentials. An isolated native PostgreSQL 18.6 instance and a real browser also exercised local desktop/mobile behavior. Live account permissions, RDS IAM/TLS and AWS networking remain unverified.
 
 ![Architecture](docs/architecture.png)
 
