@@ -18,6 +18,7 @@ resource "kubernetes_namespace_v1" "app" {
   metadata {
     name = local.namespace
     labels = {
+      "environment"                        = var.environment
       "pod-security.kubernetes.io/enforce" = "restricted"
       "pod-security.kubernetes.io/audit"   = "restricted"
       "pod-security.kubernetes.io/warn"    = "restricted"

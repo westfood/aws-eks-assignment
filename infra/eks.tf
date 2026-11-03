@@ -1,5 +1,5 @@
 resource "aws_iam_role" "cluster" {
-  name = "${var.name}-eks"
+  name = "${local.name}-eks"
   assume_role_policy = jsonencode({
     Version   = "2012-10-17"
     Statement = [{ Effect = "Allow", Action = "sts:AssumeRole", Principal = { Service = "eks.amazonaws.com" } }]
@@ -10,11 +10,11 @@ resource "aws_iam_role_policy_attachment" "cluster" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 resource "aws_cloudwatch_log_group" "eks" {
-  name              = "/aws/eks/${var.name}/cluster"
+  name              = "/aws/eks/${local.name}/cluster"
   retention_in_days = 7
 }
 resource "aws_eks_cluster" "main" {
-  name                          = var.name
+  name                          = local.name
   role_arn                      = aws_iam_role.cluster.arn
   version                       = var.kubernetes_version
   bootstrap_self_managed_addons = false
@@ -44,7 +44,7 @@ resource "aws_eks_access_policy_association" "admin" {
   access_scope { type = "cluster" }
 }
 resource "aws_iam_role" "nodes" {
-  name = "${var.name}-nodes"
+  name = "${local.name}-nodes"
   assume_role_policy = jsonencode({
     Version   = "2012-10-17"
     Statement = [{ Effect = "Allow", Action = "sts:AssumeRole", Principal = { Service = "ec2.amazonaws.com" } }]
@@ -58,12 +58,12 @@ resource "aws_iam_role_policy_attachment" "nodes" {
 # Additional identity shared by these nodes, used only as the DB ingress source.
 # The EKS primary security group handles cluster/node communication and ALB backend rules.
 resource "aws_security_group" "nodes" {
-  name_prefix = "${var.name}-nodes-"
+  name_prefix = "${local.name}-nodes-"
   description = "EKS worker identity used by the database security group"
   vpc_id      = aws_vpc.main.id
 }
 resource "aws_launch_template" "nodes" {
-  name_prefix            = "${var.name}-"
+  name_prefix            = "${local.name}-"
   update_default_version = true
   vpc_security_group_ids = [aws_eks_cluster.main.vpc_config[0].cluster_security_group_id, aws_security_group.nodes.id]
   metadata_options {
@@ -82,12 +82,15 @@ resource "aws_launch_template" "nodes" {
   }
   tag_specifications {
     resource_type = "instance"
-    tags          = { Name = "${var.name}-worker", Project = var.name, ManagedBy = "terraform" }
+    tags = {
+      Name    = "${local.name}-worker", Project = local.name, Environment = var.environment, ManagedBy = "terraform"
+      Purpose = var.environment == "dev" ? "interview" : "platform"
+    }
   }
 }
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${var.name}-workers"
+  node_group_name = "${local.name}-workers"
   node_role_arn   = aws_iam_role.nodes.arn
   subnet_ids      = [for s in aws_subnet.compute : s.id]
   ami_type        = "AL2023_x86_64_STANDARD"

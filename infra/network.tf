@@ -15,11 +15,11 @@ resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags                 = { Name = var.name }
+  tags                 = { Name = local.name }
 }
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
-  tags   = { Name = var.name }
+  tags   = { Name = local.name }
 }
 resource "aws_subnet" "public" {
   for_each                = local.zones
@@ -28,7 +28,7 @@ resource "aws_subnet" "public" {
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, tonumber(each.key))
   map_public_ip_on_launch = false
   tags = {
-    Name                     = "${var.name}-public-${each.key}"
+    Name                     = "${local.name}-public-${each.key}"
     "kubernetes.io/role/elb" = "1"
   }
 }
@@ -39,7 +39,7 @@ resource "aws_subnet" "compute" {
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, 10 + tonumber(each.key))
   map_public_ip_on_launch = false
   tags = {
-    Name                              = "${var.name}-compute-${each.key}"
+    Name                              = "${local.name}-compute-${each.key}"
     "kubernetes.io/role/internal-elb" = "1"
   }
 }
@@ -49,11 +49,11 @@ resource "aws_subnet" "database" {
   availability_zone       = each.value
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, 20 + tonumber(each.key))
   map_public_ip_on_launch = false
-  tags                    = { Name = "${var.name}-database-${each.key}" }
+  tags                    = { Name = "${local.name}-database-${each.key}" }
 }
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
-  tags   = { Name = "${var.name}-public" }
+  tags   = { Name = "${local.name}-public" }
 }
 resource "aws_route" "internet" {
   route_table_id         = aws_route_table.public.id
@@ -68,19 +68,19 @@ resource "aws_route_table_association" "public" {
 resource "aws_eip" "nat" {
   for_each = local.nat_zones
   domain   = "vpc"
-  tags     = { Name = "${var.name}-nat-${each.key}" }
+  tags     = { Name = "${local.name}-nat-${each.key}" }
 }
 resource "aws_nat_gateway" "main" {
   for_each      = local.nat_zones
   allocation_id = aws_eip.nat[each.key].id
   subnet_id     = aws_subnet.public[each.key].id
   depends_on    = [aws_internet_gateway.main]
-  tags          = { Name = "${var.name}-nat-${each.key}" }
+  tags          = { Name = "${local.name}-nat-${each.key}" }
 }
 resource "aws_route_table" "compute" {
   for_each = local.zones
   vpc_id   = aws_vpc.main.id
-  tags     = { Name = "${var.name}-compute-${each.key}" }
+  tags     = { Name = "${local.name}-compute-${each.key}" }
 }
 resource "aws_route" "compute_egress" {
   for_each               = local.zones
@@ -96,7 +96,7 @@ resource "aws_route_table_association" "compute" {
 # Isolated database tier: the VPC-local route only, deliberately no NAT/IGW route.
 resource "aws_route_table" "database" {
   vpc_id = aws_vpc.main.id
-  tags   = { Name = "${var.name}-database-isolated" }
+  tags   = { Name = "${local.name}-database-isolated" }
 }
 resource "aws_route_table_association" "database" {
   for_each       = local.zones
@@ -108,5 +108,5 @@ resource "aws_vpc_endpoint" "s3" {
   service_name      = "com.amazonaws.${var.aws_region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [for r in aws_route_table.compute : r.id]
-  tags              = { Name = "${var.name}-s3" }
+  tags              = { Name = "${local.name}-s3" }
 }

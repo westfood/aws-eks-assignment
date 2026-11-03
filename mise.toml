@@ -56,6 +56,14 @@ done
 description = "Export draw.io pages (requires draw.io Desktop or DRAWIO_BIN)"
 run = "python docs/render_architecture.py"
 
+[tasks.target]
+description = "Target one AWS environment explicitly; pass --env dev, test or prod"
+run = "python scripts/target.py"
+
+[tasks.demo]
+description = "Read-only presentation readiness checks in the dev account"
+run = "python scripts/target.py --env dev demo"
+
 [tasks.check]
 description = "Run tool, app, helper, workflow and mocked Terraform checks; no AWS deployment"
 depends = ["tools:check", "app:test", "helpers:test", "tf:check"]

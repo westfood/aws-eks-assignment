@@ -2,6 +2,8 @@
 
 This is an implementation design, not evidence of an AWS deployment. The repository can be checked locally before an AWS account exists. The live acceptance checks in the root README are required after deployment.
 
+The diagrams show the **dev account** used for the interview presentation. Test and prod use separate accounts and state, with their configuration differences described in [environment targeting](environments.md).
+
 ![Network architecture](architecture.png)
 
 The [draw.io file](architecture.drawio) is the editable source, using native AWS library icons and connectors. It has two pages: **Network and request path** and **Identity and database access**. The [SVG](architecture.svg) and PNG above are exports of the first page. The [Mermaid flow](architecture.mmd) remains a text-based overview.

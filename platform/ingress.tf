@@ -12,7 +12,7 @@ locals {
     "alb.ingress.kubernetes.io/success-codes"                = "200"
     "alb.ingress.kubernetes.io/listen-ports"                 = local.tls_enabled ? "[{\"HTTP\":80},{\"HTTPS\":443}]" : "[{\"HTTP\":80}]"
     "alb.ingress.kubernetes.io/load-balancer-attributes"     = "routing.http.drop_invalid_header_fields.enabled=true"
-    "alb.ingress.kubernetes.io/tags"                         = "Project=${var.cluster_name},ManagedBy=aws-load-balancer-controller"
+    "alb.ingress.kubernetes.io/tags"                         = "Project=${var.cluster_name},Environment=${var.environment},ManagedBy=aws-load-balancer-controller"
     }, local.tls_enabled ? {
     "alb.ingress.kubernetes.io/certificate-arn" = var.certificate_arn
     "alb.ingress.kubernetes.io/ssl-redirect"    = "443"

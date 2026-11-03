@@ -24,7 +24,7 @@ verify = load("verify_live", "verify-live.py")
 class PlatformInputsTests(unittest.TestCase):
     def outputs(self):
         values = {key: "example" for key in inputs.OUTPUTS.values()}
-        values.update(admin_cidrs=["203.0.113.8/32"], certificate_arn="", app_hostname="", route53_zone_id="")
+        values.update(environment="dev", aws_account_id="123456789012", admin_cidrs=["203.0.113.8/32"], certificate_arn="", app_hostname="", route53_zone_id="")
         return {key: {"value": value} for key, value in values.items()}
 
     def test_mapping_and_digest(self):

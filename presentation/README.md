@@ -10,6 +10,10 @@ The architecture diagrams and comparison table are native editable PowerPoint ob
 
 The detailed architecture is also available as an [editable draw.io diagram](../docs/architecture.drawio) with AWS icons and separate network and identity pages. The slides use a simplified overview for the stakeholder discussion.
 
+## Live demonstration
+
+The live interview presentation uses **dev only**. The repository supports separate dev, test and prod AWS accounts, but the presentation does not require deployment to test or prod. Use the dev-only demonstration commands in the [interview walkthrough](../docs/interview-walkthrough.md); environment selection and account/state boundaries are described in [environment targeting](../docs/environments.md).
+
 ## Regeneration
 
 The builder uses the supplied Codex presentation runtime's `@oai/artifact-tool`. It does not use `python-pptx` or PptxGenJS. Node.js, Python, presentation validators and the artifact package must be available.

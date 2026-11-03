@@ -1,4 +1,10 @@
 mock_provider "aws" {
+  mock_data "aws_eks_cluster" {
+    defaults = {
+      endpoint              = "https://example.invalid"
+      certificate_authority = [{ data = "dGVzdC1jYQ==" }]
+    }
+  }
   mock_data "aws_route53_zone" {
     defaults = { name = "example.com." }
   }
@@ -10,8 +16,10 @@ mock_provider "kubernetes" {
   }
 }
 variables {
+  environment           = "dev"
+  aws_account_id        = "123456789012"
   aws_region            = "eu-central-1"
-  cluster_name          = "contoso-offline"
+  cluster_name          = "contoso-dev"
   cluster_endpoint      = "https://example.invalid"
   cluster_ca            = "dGVzdC1jYQ=="
   vpc_id                = "vpc-12345678"
@@ -81,4 +89,65 @@ run "reject_zone_apex_cname" {
     route53_zone_id = "ZEXAMPLE"
   }
   expect_failures = [aws_route53_record.app]
+}
+
+run "test_destination_is_environment_qualified" {
+  command = plan
+  variables {
+    environment  = "test"
+    cluster_name = "contoso-test"
+  }
+  assert {
+    condition     = data.aws_eks_cluster.target.name == "contoso-test" && kubernetes_namespace_v1.app.metadata[0].labels["environment"] == "test"
+    error_message = "The platform must resolve its cluster and label workloads for the selected test target."
+  }
+}
+run "prod_destination_is_environment_qualified" {
+  command = plan
+  variables {
+    environment  = "prod"
+    cluster_name = "contoso-prod"
+  }
+  assert {
+    condition     = data.aws_eks_cluster.target.name == "contoso-prod"
+    error_message = "The platform must resolve the selected production cluster."
+  }
+}
+run "reject_unknown_environment" {
+  command = plan
+  variables { environment = "staging" }
+  expect_failures = [var.environment]
+}
+run "reject_invalid_account_id" {
+  command = plan
+  variables { aws_account_id = "not-an-account" }
+  expect_failures = [var.aws_account_id]
+}
+run "reject_cluster_from_another_environment" {
+  command = plan
+  variables { cluster_name = "contoso-prod" }
+  expect_failures = [var.cluster_name]
+}
+run "reject_mixed_cluster_metadata" {
+  command = plan
+  variables { cluster_endpoint = "https://foreign.invalid" }
+  expect_failures = [data.aws_eks_cluster.target]
+}
+run "reject_runtime_role_from_another_account" {
+  command = plan
+  variables { app_role_arn = "arn:aws:iam::234567890123:role/foreign-runtime" }
+  expect_failures = [var.app_role_arn]
+}
+run "reject_bootstrap_secret_from_another_account" {
+  command = plan
+  variables { bootstrap_secret_arn = "arn:aws:secretsmanager:eu-central-1:234567890123:secret:foreign" }
+  expect_failures = [var.bootstrap_secret_arn]
+}
+run "reject_certificate_from_another_region" {
+  command = plan
+  variables {
+    app_hostname    = "app.example.com"
+    certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/foreign"
+  }
+  expect_failures = [var.certificate_arn]
 }

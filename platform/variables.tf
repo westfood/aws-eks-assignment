@@ -1,5 +1,13 @@
 variable "aws_region" { type = string }
-variable "cluster_name" { type = string }
+variable "cluster_name" {
+  type = string
+  validation {
+    condition = contains(["dev", "test", "prod"], var.environment) ? (
+      endswith(var.cluster_name, "-${var.environment}")
+    ) : true
+    error_message = "The EKS cluster name must end in the selected environment suffix, such as contoso-dev."
+  }
+}
 variable "cluster_endpoint" { type = string }
 variable "cluster_ca" { type = string }
 variable "vpc_id" { type = string }
@@ -9,13 +17,51 @@ variable "database_subnet_cidrs" { type = list(string) }
 variable "database_host" { type = string }
 variable "database_name" { type = string }
 variable "database_user" { type = string }
-variable "bootstrap_secret_arn" { type = string }
-variable "app_role_arn" { type = string }
-variable "bootstrap_role_arn" { type = string }
-variable "controller_role_arn" { type = string }
+variable "bootstrap_secret_arn" {
+  type = string
+  validation {
+    condition = can(regex("^[0-9]{12}$", var.aws_account_id)) ? (
+      startswith(var.bootstrap_secret_arn, "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:")
+    ) : true
+    error_message = "bootstrap_secret_arn must belong to the selected AWS account and Region."
+  }
+}
+variable "app_role_arn" {
+  type = string
+  validation {
+    condition = can(regex("^[0-9]{12}$", var.aws_account_id)) ? (
+      startswith(var.app_role_arn, "arn:aws:iam::${var.aws_account_id}:role/")
+    ) : true
+    error_message = "app_role_arn must belong to the selected AWS account."
+  }
+}
+variable "bootstrap_role_arn" {
+  type = string
+  validation {
+    condition = can(regex("^[0-9]{12}$", var.aws_account_id)) ? (
+      startswith(var.bootstrap_role_arn, "arn:aws:iam::${var.aws_account_id}:role/")
+    ) : true
+    error_message = "bootstrap_role_arn must belong to the selected AWS account."
+  }
+}
+variable "controller_role_arn" {
+  type = string
+  validation {
+    condition = can(regex("^[0-9]{12}$", var.aws_account_id)) ? (
+      startswith(var.controller_role_arn, "arn:aws:iam::${var.aws_account_id}:role/")
+    ) : true
+    error_message = "controller_role_arn must belong to the selected AWS account."
+  }
+}
 variable "waf_acl_arn" {
   type    = string
   default = ""
+  validation {
+    condition = var.waf_acl_arn == "" || !can(regex("^[0-9]{12}$", var.aws_account_id)) ? true : (
+      startswith(var.waf_acl_arn, "arn:aws:wafv2:${var.aws_region}:${var.aws_account_id}:regional/webacl/")
+    )
+    error_message = "waf_acl_arn must belong to the selected AWS account and Region."
+  }
 }
 variable "admin_cidrs" { type = list(string) }
 variable "app_image" {
@@ -29,6 +75,12 @@ variable "app_image" {
 variable "certificate_arn" {
   type    = string
   default = ""
+  validation {
+    condition = var.certificate_arn == "" || !can(regex("^[0-9]{12}$", var.aws_account_id)) ? true : (
+      startswith(var.certificate_arn, "arn:aws:acm:${var.aws_region}:${var.aws_account_id}:certificate/")
+    )
+    error_message = "certificate_arn must belong to the selected AWS account and Region."
+  }
 }
 variable "app_hostname" {
   type    = string

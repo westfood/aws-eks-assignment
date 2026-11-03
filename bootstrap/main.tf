@@ -1,13 +1,20 @@
 terraform {
   required_version = ">= 1.14, < 2.0"
+  backend "local" {}
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 6.0" }
   }
 }
 
 provider "aws" {
-  region = var.aws_region
-  default_tags { tags = { Project = "contoso-demo", ManagedBy = "terraform", Purpose = "interview" } }
+  region              = var.aws_region
+  allowed_account_ids = [var.aws_account_id]
+  default_tags {
+    tags = {
+      Project = "contoso-${var.environment}", Environment = var.environment, ManagedBy = "terraform"
+      Purpose = var.environment == "dev" ? "interview" : "platform"
+    }
+  }
 }
 
 variable "aws_region" {
@@ -63,3 +70,6 @@ resource "aws_s3_bucket_policy" "state_tls" {
 
 output "state_bucket_name" { value = aws_s3_bucket.state.id }
 output "region" { value = var.aws_region }
+
+output "environment" { value = var.environment }
+output "aws_account_id" { value = var.aws_account_id }

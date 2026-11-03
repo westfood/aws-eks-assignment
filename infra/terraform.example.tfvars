@@ -1,4 +1,6 @@
-name                    = "contoso-demo"
+environment             = "dev"
+aws_account_id          = "123456789012" # EXAMPLE ONLY: replace with this environment's AWS account
+name                    = "contoso"
 aws_region              = "eu-central-1"
 admin_cidrs             = ["203.0.113.10/32"] # EXAMPLE ONLY: replace with your current public IPv4 /32
 admin_principal_arn     = "arn:aws:iam::123456789012:role/replace-with-your-deployment-role"

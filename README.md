@@ -11,17 +11,17 @@ Verification on **3 November 2026**: [all six CI jobs passed](https://github.com
 ![Architecture](docs/architecture.png)
 
 - [Architecture and network boundaries](docs/architecture.md), [decisions](docs/decisions.md), [editable draw.io diagram](docs/architecture.drawio)
-- [Interview walkthrough](docs/interview-walkthrough.md), [cost and cleanup](docs/cost-and-cleanup.md), [primary sources](docs/sources.md)
+- [Environment targeting](docs/environments.md), [interview walkthrough](docs/interview-walkthrough.md), [cost and cleanup](docs/cost-and-cleanup.md), [primary sources](docs/sources.md)
 - Presentation: see `presentation/` for the English stakeholder deck and speaker notes.
 - Application: see `app/` for the frontend, database code, tests and image.
 
-The default uses two worker nodes, one NAT Gateway and a Single-AZ database. Two database subnets do not imply a Multi-AZ DB. WAF is enabled by default. This is a demonstration, with synthetic messages and no end-user authentication. The enterprise landing-zone recommendation belongs in the presentation; this repository does not provision Control Tower or an organization-wide landing zone.
+The same source supports **dev, test and prod in separate AWS accounts**. The live presentation uses **dev only**. Dev uses two worker nodes, one NAT Gateway and a Single-AZ database; test/prod examples enable AZ-local NAT and Multi-AZ RDS. Two database subnets alone do not imply a Multi-AZ DB. This application accepts synthetic messages without end-user authentication, so account targeting and HA settings do not make it a production-ready product. The repository does not provision AWS accounts, Control Tower or an organization-wide landing zone.
 
-## 1. Prepare tools and an AWS identity
+## 1. Prepare tools
 
-Install [mise](https://mise.jdx.dev/getting-started.html), Git, and a working Docker engine with the Compose and Buildx plugins. The project records its development tools in [mise.toml](mise.toml) and their platform-specific downloads in [mise.lock](mise.lock). The same configuration supplies Python and Terraform in CI. The lock covers macOS ARM64 and Linux x86-64.
+Install [mise](https://mise.jdx.dev/getting-started.html), Git, and a working Docker engine with Compose and Buildx. [mise.toml](mise.toml) pins the project tools; [mise.lock](mise.lock) records platform-specific downloads for macOS ARM64 and Linux x86-64. CI uses the same configuration.
 
-Run commands from the repository root in a Bash/Zsh terminal. Review the mise configuration and tasks before trusting it, install the locked tools, then load them into this terminal:
+Run commands from the repository root in Bash/Zsh:
 
 ```bash
 git clone https://github.com/westfood/aws-eks-assignment.git
@@ -31,53 +31,41 @@ mise trust
 mise install --locked
 eval "$(mise env -s zsh)" # Use -s bash in Bash
 umask 077
-mkdir -p .local
-mise ls --current
 mise run tools:check
 mise run tools:docker
 ```
 
-The environment command applies to the current terminal session. Run it again when opening another terminal, or use `mise exec -- terraform version` to apply the project toolset to one command. Persistent shell activation is optional; see [mise shell setup](https://mise.jdx.dev/shell-setup.html). `tools:check` verifies the selected CLI versions. `tools:docker` checks the engine, Compose and Buildx without starting or changing containers. draw.io Desktop is optional for diagram exports, and presentation regeneration also needs the authoring runtime described in `presentation/`.
+The environment command affects this terminal session. You can instead prefix individual commands with `mise exec --`. Persistent [shell activation](https://mise.jdx.dev/shell-setup.html) is optional. Project settings give pinned tools precedence over earlier Homebrew/system binaries. Docker's engine, draw.io Desktop and the optional presentation authoring runtime remain separate prerequisites.
 
-If there is no account yet, create one at [AWS signup](https://portal.aws.amazon.com/billing/signup), secure its root login with MFA and configure billing alerts. Use the root identity only for account setup. Choose a plan that permits the required services and review the estimate in [cost and cleanup](docs/cost-and-cleanup.md); EKS is not an automatically free lab. [Root-user guidance](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html)
+## 2. Configure the dev account target
 
-For a fresh standalone account, create a console IAM user with MFA or use an existing federated role. Grant `SignInLocalDevelopmentAccess` for browser-based CLI login. For this disposable lab, the deployment identity also needs administrative permissions to create IAM roles, EKS access entries and networking; ordinary `PowerUserAccess` is insufficient for IAM creation. Production should use a reviewed deployment role with scoped permissions.
+Every cloud command requires `--env dev`, `--env test` or `--env prod`. The helper selects that target's AWS profile, verifies its account, and uses its private state, plans, outputs and kubeconfig. There is no implicit default environment. The interview's `demo` command accepts dev only.
 
-AWS CLI `aws login` obtains temporary credentials using the browser without long-lived access keys. A separate `credential_process` profile bridges those credentials to Terraform and other tools. The profile names must remain distinct. [AWS browser login and credential-process bridge](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html)
+Prepare **dev** for the presentation:
 
 ```bash
-aws login --profile contoso-signin
-aws configure set credential_process 'aws configure export-credentials --profile contoso-signin --format process' --profile contoso-lab
-aws configure set region eu-central-1 --profile contoso-lab
-export AWS_PROFILE=contoso-lab
-export AWS_REGION=eu-central-1
-export AWS_DEFAULT_REGION="$AWS_REGION"
-export AWS_PAGER=""
-unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-aws sts get-caller-identity
+cp environments/dev.example.json environments/dev.json
 ```
 
-When the browser session expires, repeat `aws login --profile contoso-signin`. Do not print or commit exported credentials, login caches or Terraform credentials.
+Edit `environments/dev.json`: provide the real dev account ID, its AWS profile, a globally unique dev state-bucket name, the intended IAM administrator role/user ARN, and your trusted public IPv4 `/32` under `infra.admin_cidrs`. The JSON file is ignored by Git. Use separate account IDs, profiles and buckets when you later prepare `test.json` or `prod.json` from their examples. See [environment configuration and isolation](docs/environments.md).
 
-If you already use IAM Identity Center, choose this alternative **instead of** the two-profile bridge:
+Authenticate the configured profile using temporary credentials. For a standalone dev account with a console IAM user or federated role, AWS CLI browser login can supply a separate process-credential profile:
 
 ```bash
-aws configure sso --profile contoso-lab
-aws sso login --profile contoso-lab
-export AWS_PROFILE=contoso-lab
-export AWS_REGION=eu-central-1
-export AWS_DEFAULT_REGION="$AWS_REGION"
-export AWS_PAGER=""
-unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-aws sts get-caller-identity
+aws login --profile contoso-dev-signin
+aws configure set credential_process 'aws configure export-credentials --profile contoso-dev-signin --format process' --profile contoso-dev
+aws configure set region eu-central-1 --profile contoso-dev
+aws --profile contoso-dev sts get-caller-identity
 ```
 
-The SSO wizard needs the access-portal URL, Identity Center Region, account and permission set. Renew this alternative with `aws sso login --profile contoso-lab`. An organization instance is needed for AWS account assignments. **Creating an organization from a free-tier account currently upgrades it to the paid plan and expires its free-tier credits immediately.** Review that consequence before enabling new SSO; an account instance alone does not provide this account-access flow. The repository creates neither account nor organization. [SSO CLI setup](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html), [Identity Center setup and account-plan consequence](https://docs.aws.amazon.com/singlesignon/latest/userguide/enable-identity-center.html)
+The login identity needs `SignInLocalDevelopmentAccess` and deployment permissions. This exercise creates IAM roles, policies, EKS access entries and networking, so ordinary `PowerUserAccess` is insufficient for IAM creation. Use a non-root deployment identity; production needs a reviewed deployment role. Renew this session with `aws login --profile contoso-dev-signin`. [AWS browser login](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html)
 
-EKS needs an **IAM user/role ARN**, rather than an STS session ARN. Preserve the complete IAM role path. This handles either an IAM-user session or an assumed-role session:
+If you already use IAM Identity Center, configure the target profile with `aws configure sso --profile contoso-dev` and renew it with `aws sso login --profile contoso-dev` instead. Account assignments require an organization instance. Creating an organization can change a new account's plan and credits; review the [Identity Center setup consequences](https://docs.aws.amazon.com/singlesignon/latest/userguide/enable-identity-center.html) first. The repository creates neither an account nor an organization. Secure any newly created account's root login with MFA and review [cost and cleanup](docs/cost-and-cleanup.md) before deployment.
+
+For `infra.admin_principal_arn`, use the full IAM user/role ARN, including a role's path. An STS assumed-role session ARN is not valid. These explicit-profile commands identify the underlying IAM principal:
 
 ```bash
-CALLER_ARN="$(aws sts get-caller-identity --query Arn --output text)"
+CALLER_ARN="$(aws --profile contoso-dev sts get-caller-identity --query Arn --output text)"
 ADMIN_PRINCIPAL_ARN=""
 case "$CALLER_ARN" in
   arn:aws:iam::*:user/*)
@@ -86,225 +74,153 @@ case "$CALLER_ARN" in
   arn:aws:sts::*:assumed-role/*)
     ROLE_NAME="${CALLER_ARN#*:assumed-role/}"
     ROLE_NAME="${ROLE_NAME%/*}"
-    ADMIN_PRINCIPAL_ARN="$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text)"
+    ADMIN_PRINCIPAL_ARN="$(aws --profile contoso-dev iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text)"
     ;;
   *)
     printf '%s\n' 'Select a non-root IAM deployment user or role before continuing.' >&2
     ;;
 esac
 printf '%s\n' "$ADMIN_PRINCIPAL_ARN"
+curl --proto '=https' --tlsv1.2 --fail --silent --show-error https://checkip.amazonaws.com
 ```
 
-Do not continue if that variable is empty or contains an STS session/root ARN. Confirm the account is the intended lab account before any apply.
+Copy the appropriate values into the private config. The IP-check endpoint reports the workstation's public address; a VPN/network change may require a new `/32`.
 
-## 2. Create the Terraform state bucket
-
-The `bootstrap/` root uses local state to create an encrypted, versioned, private S3 bucket with TLS-only access. Keep its local state protected; the other roots use separate S3 state keys and native lock files.
+Review the target without changing AWS, then check its authenticated account:
 
 ```bash
-STATE_BUCKET="contoso-tfstate-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:16])')"
-cat > bootstrap/terraform.tfvars <<EOF
-aws_region = "$AWS_REGION"
-state_bucket_name = "$STATE_BUCKET"
-EOF
-terraform -chdir=bootstrap init
-terraform -chdir=bootstrap plan -out=../.local/bootstrap.tfplan
-terraform -chdir=bootstrap show ../.local/bootstrap.tfplan
-terraform -chdir=bootstrap apply ../.local/bootstrap.tfplan
+mise run target -- --env dev show
+mise run target -- --env dev check
 ```
 
-An `apply` of a saved plan executes the reviewed plan directly. Run it only after reviewing its contents. Saved plans, state, outputs and real input files are private and ignored by Git.
+## 3. Create dev Terraform state storage
 
-Create the two backend files after the bucket exists:
+The `bootstrap` root creates an encrypted, versioned, private S3 bucket with TLS-only access in the selected account. Its local state stays under the dev artifact directory. Infra and platform use separate S3 state keys in that account. The helper generates the environment-specific input/backend files and isolates Terraform initialization data.
 
 ```bash
-STATE_BUCKET="$(terraform -chdir=bootstrap output -raw state_bucket_name)"
-cat > infra/backend.hcl <<EOF
-bucket = "$STATE_BUCKET"
-key = "contoso/infra/terraform.tfstate"
-region = "$AWS_REGION"
-encrypt = true
-use_lockfile = true
-EOF
-cat > platform/backend.hcl <<EOF
-bucket = "$STATE_BUCKET"
-key = "contoso/platform/terraform.tfstate"
-region = "$AWS_REGION"
-encrypt = true
-use_lockfile = true
-EOF
+mise run target -- --env dev terraform bootstrap init
+mise run target -- --env dev terraform bootstrap plan
+mise run target -- --env dev terraform bootstrap apply
+mise run target -- --env dev terraform bootstrap output
 ```
 
-The deployment identity needs S3 object access to these keys and their `.tflock` files. Do not delete the bucket before the managed infrastructure is gone.
+Review the printed plan before `apply`. Apply uses the saved plan for this exact target and rejects a mismatched plan manifest. Plans, state and generated inputs remain private under `.local/dev/`; real environment JSON files are also ignored. No plan or state is shared with test/prod.
 
-## 3. Plan and deploy AWS infrastructure
+## 4. Plan and deploy dev infrastructure
 
-Obtain the public IPv4 address of the workstation that will administer the cluster. This HTTPS request sends an ordinary request to AWS's IP-check endpoint. A VPN/network change may change the address:
+Before the live apply, check available EKS versions, choose an exact supported PostgreSQL minor and review account quotas:
 
 ```bash
-ADMIN_CIDR="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error https://checkip.amazonaws.com | tr -d '\r\n')/32"
-cp infra/terraform.example.tfvars infra/terraform.tfvars
+mise run target -- --env dev aws eks describe-cluster-versions --query 'clusterVersions[].{version:clusterVersion,status:versionStatus}' --output table
+mise run target -- --env dev aws rds describe-db-engine-versions --engine postgres --query 'DBEngineVersions[?starts_with(EngineVersion, `17.`)].EngineVersion' --output table
 ```
 
-Edit `infra/terraform.tfvars` and set:
+Set `infra.postgres_engine_version` to the chosen minor in `environments/dev.json`. The dev DB defaults to `db.t4g.small` because IAM DB authentication needs memory headroom.
 
-```hcl
-admin_cidrs         = ["YOUR_CURRENT_PUBLIC_IPV4/32"]
-admin_principal_arn = "YOUR_EXISTING_IAM_ROLE_ARN"
-```
-
-Use the values in `$ADMIN_CIDR` and `$ADMIN_PRINCIPAL_ARN`, set the chosen Region, and review every example value. Keep the restricted API CIDR even if the application later becomes public. Confirm the selected EKS version is available in the chosen Region and in standard support. Resolve an exact PostgreSQL minor before applying:
+For trusted HTTPS, also set `infra.tls_domain_name` to an owned subdomain and `infra.tls_zone_id` to its public Route53 hosted zone ID. Domain delegation must already work. Terraform requests a regional ACM certificate and creates DNS validation; platform deployment creates the application CNAME. Without those inputs, the dev endpoint is HTTP restricted to trusted client CIDRs and synthetic data.
 
 ```bash
-aws eks describe-cluster-versions --query 'clusterVersions[].{version:clusterVersion,status:versionStatus}' --output table
-aws rds describe-db-engine-versions --engine postgres --query 'DBEngineVersions[?starts_with(EngineVersion, `17.`)].EngineVersion' --output table
+mise run target -- --env dev terraform infra init
+mise run target -- --env dev terraform infra plan
+mise run target -- --env dev terraform infra apply
+mise run target -- --env dev terraform infra output
 ```
 
-Set `postgres_engine_version` to the supported exact minor you choose. Instance availability and account quotas also need checking in the target Region. The database defaults to `db.t4g.small` because IAM authentication needs additional memory headroom.
+The output command writes `.local/dev/infra-outputs.json`. Keep the API CIDRs restricted even if application ingress is later made public. Setting `infra.private_only_api=true` requires a VPC-connected workstation or runner for subsequent Kubernetes/Helm operations; it does not create that connection.
 
-For trusted HTTPS, optionally add these inputs **before** the infrastructure apply:
+## 5. Build and push the dev application image
 
-```hcl
-tls_domain_name = "app.example.com" # A subdomain you own
-tls_zone_id     = "YOUR_PUBLIC_ROUTE53_HOSTED_ZONE_ID"
-```
-
-The public hosted zone and domain delegation must already work. Terraform requests a regional ACM certificate and creates its DNS-validation record; the platform later creates a CNAME to the ALB. Use a subdomain, since this implementation uses a CNAME rather than an apex Alias record. Domain registration/delegation is outside this demo. Without these inputs, the default is source-restricted HTTP with synthetic data, rather than an unverified certificate for the AWS-owned ALB hostname.
+ECR is account-specific. Read the repository from dev's managed outputs and build `linux/amd64` for the x86-64 managed nodes, including from an Apple Silicon Mac:
 
 ```bash
-terraform -chdir=infra init -backend-config=backend.hcl
-terraform -chdir=infra validate
-terraform -chdir=infra plan -out=../.local/infra.tfplan
-terraform -chdir=infra show ../.local/infra.tfplan
-terraform -chdir=infra apply ../.local/infra.tfplan
-terraform -chdir=infra output -json > .local/infra-outputs.json
-chmod 600 .local/infra-outputs.json
-```
-
-The default enables private API access and restricts the public API endpoint to `admin_cidrs`. Setting `private_only_api=true` requires a connected workstation or an in-VPC runner for the later Helm, Kubernetes and `kubectl` operations. It does not create that connectivity for you.
-
-## 4. Build an immutable application image
-
-The managed node image is x86-64, so explicitly build `linux/amd64`, including from an Apple Silicon Mac. ECR is private; its login token is piped to Docker and is not written to the repository:
-
-```bash
-ECR_REPOSITORY="$(terraform -chdir=infra output -raw ecr_repository_url)"
+ECR_REPOSITORY="$(python3 -c 'import json; print(json.load(open(".local/dev/infra-outputs.json"))["ecr_repository_url"]["value"])')"
 ECR_REGISTRY="${ECR_REPOSITORY%%/*}"
-IMAGE_TAG="demo-$(date -u +%Y%m%d%H%M%S)"
-aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-docker buildx build --platform linux/amd64 --tag "$ECR_REPOSITORY:$IMAGE_TAG" --push ./app
 ECR_NAME="${ECR_REPOSITORY#*/}"
-IMAGE_DIGEST="$(aws ecr describe-images --repository-name "$ECR_NAME" --image-ids imageTag="$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
+IMAGE_TAG="demo-$(date -u +%Y%m%d%H%M%S)"
+mise run target -- --env dev aws ecr get-login-password | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+docker buildx build --platform linux/amd64 --tag "$ECR_REPOSITORY:$IMAGE_TAG" --push ./app
+IMAGE_DIGEST="$(mise run target -- --env dev aws ecr describe-images --repository-name "$ECR_NAME" --image-ids imageTag="$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
 APP_IMAGE="$ECR_REPOSITORY@$IMAGE_DIGEST"
 printf '%s\n' "$APP_IMAGE"
 ```
 
-Review image scan findings before using the image. The Kubernetes deployment requires the digest form, so a changed tag cannot silently change the deployed image.
+Review ECR scan findings. Platform inputs require `repository@sha256:...`, so changing a tag cannot silently replace the deployed image.
 
-## 5. Deploy the Kubernetes platform
+## 6. Deploy the dev Kubernetes platform
 
-The helper maps known `infra` outputs to platform inputs and writes mode `0600`; it does not call AWS or run Terraform. It refuses to replace an existing file unless `--overwrite` is provided:
+The environment helper reads **dev's** infrastructure outputs, checks their account/environment metadata and creates private platform inputs. It refuses to overwrite those inputs unless `--overwrite` is explicit:
 
 ```bash
-python3 scripts/platform-inputs.py --infra-outputs .local/infra-outputs.json --image "$APP_IMAGE"
-terraform -chdir=platform init -backend-config=backend.hcl
-terraform -chdir=platform validate
-terraform -chdir=platform plan -out=../.local/platform.tfplan
-terraform -chdir=platform show ../.local/platform.tfplan
-terraform -chdir=platform apply ../.local/platform.tfplan
+mise run target -- --env dev platform-inputs --image "$APP_IMAGE"
+mise run target -- --env dev terraform platform init
+mise run target -- --env dev terraform platform plan
+mise run target -- --env dev terraform platform apply
+mise run target -- --env dev terraform platform output
 ```
 
-This installs AWS Load Balancer Controller, NetworkPolicies, a separate database-initialization Job, the frontend/API Deployment, Service and Ingress. The initialization role alone can read the RDS-managed master secret. The serving role has `rds-db:connect` for `contoso_app`, with restricted SQL privileges; it cannot fetch that secret. App-to-RDS connections use the actual RDS hostname and bundled AWS CA with `verify-full`.
+This installs AWS Load Balancer Controller, NetworkPolicies, a DB initialization Job, the frontend/API Deployment, Service and Ingress. The initialization role alone reads the RDS-managed master secret. The serving role permits `rds-db:connect` as the restricted SQL user. Connections use the RDS endpoint and bundled AWS CA with `verify-full`.
 
-With a validated HTTPS hostname, you can explicitly widen application access while leaving the API restricted:
+With a validated HTTPS hostname, explicitly widen application access while keeping the EKS API restricted:
 
 ```bash
-python3 scripts/platform-inputs.py --infra-outputs .local/infra-outputs.json --image "$APP_IMAGE" --ingress-cidr 0.0.0.0/0 --overwrite
-terraform -chdir=platform plan -out=../.local/platform-public.tfplan
-terraform -chdir=platform show ../.local/platform-public.tfplan
-terraform -chdir=platform apply ../.local/platform-public.tfplan
+mise run target -- --env dev platform-inputs --image "$APP_IMAGE" --ingress-cidr 0.0.0.0/0 --overwrite
+mise run target -- --env dev terraform platform plan
+mise run target -- --env dev terraform platform apply
 ```
 
-The helper and Terraform reject the internet-wide HTTP-only case. Changing inputs regenerates a plan; do not reuse an old plan after editing them.
+Both input generation and Terraform reject internet-wide plaintext ingress. Editing inputs requires a new plan; do not reuse a saved plan after changing them.
 
-## 6. Verify the live deployment
+## 7. Verify and present dev
 
-Keep this assignment's kubeconfig separate from existing lab contexts. `update-kubeconfig` writes a current context only inside the dedicated file, leaving the normal kubeconfig unchanged. EKS CA verification remains enabled:
+The generated kubeconfig is `.local/dev/kubeconfig`. It retains EKS CA verification and does not change normal lab contexts. The wrapper selects this file and target context for every Kubernetes command:
 
 ```bash
-CLUSTER_NAME="$(terraform -chdir=infra output -raw cluster_name)"
-LAB_KUBECONFIG="$PWD/.local/kubeconfig"
-LAB_CONTEXT="contoso-assignment"
-aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION" --kubeconfig "$LAB_KUBECONFIG" --alias "$LAB_CONTEXT"
-chmod 600 "$LAB_KUBECONFIG"
-kubectl --kubeconfig "$LAB_KUBECONFIG" --context "$LAB_CONTEXT" get nodes
-kubectl --kubeconfig "$LAB_KUBECONFIG" --context "$LAB_CONTEXT" -n contoso get pods,jobs,services,ingresses,networkpolicies
-kubectl --kubeconfig "$LAB_KUBECONFIG" --context "$LAB_CONTEXT" -n contoso rollout status deployment/contoso-app --timeout=5m
-APPLICATION_URL="$(terraform -chdir=platform output -raw application_url)"
+mise run target -- --env dev kubeconfig
+mise run target -- --env dev kubectl get nodes
+mise run target -- --env dev kubectl -n contoso get pods,jobs,services,ingresses,networkpolicies
+mise run target -- --env dev kubectl -n contoso rollout status deployment/contoso-app --timeout=5m
+APPLICATION_URL="$(python3 -c 'import json; print(json.load(open(".local/dev/platform-outputs.json"))["application_url"]["value"])')"
 printf '%s\n' "$APPLICATION_URL"
+mise run target -- --env dev demo
+```
+
+`demo` performs read-only readiness checks and is deliberately restricted to dev. Open `$APPLICATION_URL`, save a synthetic message and refresh to show persistence. For an explicit automated write/read check:
+
+```bash
 python3 scripts/verify-live.py --url "$APPLICATION_URL" --write-message
 ```
 
-Open that URL, add a synthetic message and refresh to verify persistence. The check script uses normal CA and hostname verification for HTTPS and saves one labeled synthetic message when `--write-message` is supplied. Readiness establishes a DB roundtrip, whereas liveness only establishes the HTTP process is alive.
-
-Optionally create and then delete a temporary Job whose Pod lacks the app/bootstrap labels to observe a NetworkPolicy denial:
+Inspect AWS boundaries through the same target:
 
 ```bash
-python3 scripts/verify-live.py --url "$APPLICATION_URL" --check-networkpolicy --kubeconfig "$LAB_KUBECONFIG" --context "$LAB_CONTEXT"
+CLUSTER_NAME="$(python3 -c 'import json; print(json.load(open(".local/dev/infra-outputs.json"))["cluster_name"]["value"])')"
+mise run target -- --env dev aws rds describe-db-instances --db-instance-identifier "$CLUSTER_NAME" --query 'DBInstances[0].{public:PubliclyAccessible,multiAZ:MultiAZ,iamAuth:IAMDatabaseAuthenticationEnabled,encrypted:StorageEncrypted,subnets:DBSubnetGroup.Subnets[].SubnetIdentifier,groups:VpcSecurityGroups[].VpcSecurityGroupId}'
+mise run target -- --env dev kubectl -n contoso get serviceaccount contoso-app contoso-bootstrap -o yaml
+mise run target -- --env dev kubectl -n contoso describe ingress contoso-app
 ```
 
-This reuses the deployed application image, requires DNS resolution, and expects DB TCP connection attempts to time out. A failed image pull or unrelated socket error is inconclusive. VPC CNI standard mode can briefly allow traffic before policy programming; the probe waits before attempting connections. It uses a controller-owned Pod because AWS documents unreliable enforcement for standalone Pods. This is a policy check, **not a test that the node SG distinguishes Pods**. Any Pod sharing the allowed node SG may otherwise reach TCP `5432`; IAM and SQL grants supply additional authorization boundaries. [VPC CNI policy considerations](https://docs.aws.amazon.com/eks/latest/userguide/cni-network-policy.html)
-
-Inspect AWS and Kubernetes configuration without retrieving the master secret:
-
-```bash
-aws rds describe-db-instances --db-instance-identifier "$CLUSTER_NAME" --query 'DBInstances[0].{public:PubliclyAccessible,multiAZ:MultiAZ,iamAuth:IAMDatabaseAuthenticationEnabled,encrypted:StorageEncrypted,subnets:DBSubnetGroup.Subnets[].SubnetIdentifier,groups:VpcSecurityGroups[].VpcSecurityGroupId}'
-DB_SG_ID="$(aws rds describe-db-instances --db-instance-identifier "$CLUSTER_NAME" --query 'DBInstances[0].VpcSecurityGroups[0].VpcSecurityGroupId' --output text)"
-aws ec2 describe-security-groups --group-ids "$DB_SG_ID" --query 'SecurityGroups[0].IpPermissions'
-kubectl --kubeconfig "$LAB_KUBECONFIG" --context "$LAB_CONTEXT" -n contoso get serviceaccount contoso-app contoso-bootstrap -o yaml
-kubectl --kubeconfig "$LAB_KUBECONFIG" --context "$LAB_CONTEXT" -n contoso describe ingress contoso-app
-```
-
-Also confirm the ALB target group is healthy, the WAF association/rules exist, and the app role cannot read the master secret. IAM policy inspection is not the same as a negative live permission test. Record which checks were actually executed, their results and the deployed commit. [Evidence and interview guide](docs/interview-walkthrough.md)
+Also confirm target-group health, WAF association/rules, NetworkPolicy enforcement and the app role's inability to read the master secret. A successful policy inspection is not a negative live permission test. Record the actual checks, deployed revision and intentionally retained resource categories. See the [interview walkthrough](docs/interview-walkthrough.md).
 
 ## Local checks without AWS
-
-After the mise setup, run all account-free checks with:
 
 ```bash
 mise run check
 ```
 
-This checks tool versions, app and helper tests, workflow syntax and all three Terraform roots. It downloads dependencies when needed; it performs no AWS deployment. Application DB integration is skipped unless the explicit local database settings are supplied, as described in `app/`. `mise tasks ls` lists the tasks, including these individual checks:
+This checks tool versions, app/helper tests, workflow syntax and all three Terraform roots using mocked providers. It downloads dependencies when needed and performs no AWS deployment. App DB integration is skipped unless the explicit local database settings in [app/README.md](app/README.md) are supplied.
 
 | Task | Purpose |
 | --- | --- |
-| `mise run tools:check` | Verify project CLI versions |
+| `mise run tools:check` | Verify pinned CLI versions |
 | `mise run tools:docker` | Check Docker engine and plugins |
-| `mise run app:setup` | Create `app/.venv` and install locked Python packages |
-| `mise run app:test` | Run app tests, preparing the virtual environment first |
-| `mise run helpers:test` | Run deployment-helper tests |
-| `mise run tf:check` | Format-check, initialize, validate and mock-test Terraform |
-| `mise run diagrams:export` | Export the draw.io pages; requires draw.io Desktop |
+| `mise run app:setup` | Create `app/.venv` and install locked packages |
+| `mise run app:test` | Run app tests; DB integration needs explicit local settings |
+| `mise run helpers:test` | Test deployment helpers without AWS |
+| `mise run tf:check` | Validate/mock-test all Terraform roots |
+| `mise run diagrams:export` | Export draw.io previews with draw.io Desktop |
+| `mise run target -- --env dev show` | Inspect a configured account target without cloud operations |
 
-For manual inspection, the Terraform and helper commands remain available after loading the mise environment. Backend-free initialization does not connect to the state bucket:
-
-```bash
-terraform fmt -check -recursive
-terraform -chdir=bootstrap init -backend=false
-terraform -chdir=bootstrap validate
-terraform -chdir=bootstrap test
-terraform -chdir=infra init -backend=false
-terraform -chdir=infra validate
-terraform -chdir=infra test
-terraform -chdir=platform init -backend=false
-terraform -chdir=platform validate
-terraform -chdir=platform test
-python3 -m py_compile scripts/platform-inputs.py scripts/verify-live.py
-python3 -m unittest discover -s scripts -p 'test_*.py'
-```
-
-For application tests and local PostgreSQL, follow the application instructions in `app/`. The optional Compose route is:
+For a separate local Compose test:
 
 ```bash
 docker compose up --build --detach
@@ -312,52 +228,35 @@ python3 scripts/verify-live.py --url http://127.0.0.1:18080 --write-message
 docker compose down
 ```
 
-Compose uses local-only passwords and disables DB TLS solely for the isolated local test. It does not emulate RDS IAM, AWS security groups, ALB or WAF. `docker compose down` retains the local database volume; `docker compose down --volumes` deliberately deletes its synthetic data. Do not commit actual output/state/plan files or account details as test evidence.
+Compose uses disposable local passwords and disables DB TLS only in its local setup. It does not emulate RDS IAM, AWS networking, ALB or WAF. `docker compose down` retains the synthetic DB volume; `--volumes` deliberately deletes it.
 
-## Tear down safely
+## Tear down the selected environment
 
-Keep your login credentials valid and retain the controller until its Ingress has been removed. First save the ALB ARN for the deletion waiter, then plan removal of the managed Ingress and any dependent DNS record. Check that the targeted plan keeps the controller running so the Ingress finalizer can clean up AWS resources:
-
-```bash
-ALB_HOSTNAME="$(terraform -chdir=platform output -raw alb_hostname)"
-ALB_ARN="$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$ALB_HOSTNAME'].LoadBalancerArn | [0]" --output text)"
-terraform -chdir=platform plan -destroy -target=kubernetes_ingress_v1.app -out=../.local/ingress-destroy.tfplan
-terraform -chdir=platform show ../.local/ingress-destroy.tfplan
-terraform -chdir=platform apply ../.local/ingress-destroy.tfplan
-aws elbv2 wait load-balancers-deleted --load-balancer-arns "$ALB_ARN"
-terraform -chdir=platform plan -destroy -out=../.local/platform-destroy.tfplan
-terraform -chdir=platform show ../.local/platform-destroy.tfplan
-terraform -chdir=platform apply ../.local/platform-destroy.tfplan
-```
-
-This narrowly scoped destroy is an intentional teardown sequence; ordinary updates should use complete plans. If the Ingress/ALB does not disappear, inspect controller logs and its IAM permissions before removing it. Never force-remove a finalizer merely to make the command finish.
-
-The RDS default prevents deletion. Edit `infra/terraform.tfvars` to set `db_deletion_protection=false` and choose snapshot retention deliberately. Keep `db_skip_final_snapshot=false` to retain the final snapshot; set it to `true` only if all data is disposable. The following variable supplies a unique final snapshot identifier to both teardown plans; keep it set through destruction. Review and apply the retention change before destruction:
+The presentation cleanup targets **dev**. Keep the controller running until its Ingress finalizer has removed the ALB. First capture the ALB ARN, then review/apply an Ingress-only destroy plan and wait for AWS deletion:
 
 ```bash
-export TF_VAR_db_final_snapshot_identifier="${CLUSTER_NAME}-final-$(date -u +%Y%m%d%H%M%S)"
-printf '%s\n' "$TF_VAR_db_final_snapshot_identifier" > .local/final-snapshot-id
-terraform -chdir=infra plan -out=../.local/cleanup-settings.tfplan
-terraform -chdir=infra show ../.local/cleanup-settings.tfplan
-terraform -chdir=infra apply ../.local/cleanup-settings.tfplan
+ALB_HOSTNAME="$(python3 -c 'import json; print(json.load(open(".local/dev/platform-outputs.json"))["alb_hostname"]["value"])')"
+ALB_ARN="$(mise run target -- --env dev aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$ALB_HOSTNAME'].LoadBalancerArn | [0]" --output text)"
+mise run target -- --env dev terraform platform plan --destroy --ingress-only
+mise run target -- --env dev terraform platform apply --destroy --ingress-only
+mise run target -- --env dev aws elbv2 wait load-balancers-deleted --load-balancer-arns "$ALB_ARN"
+mise run target -- --env dev terraform platform plan --destroy
+mise run target -- --env dev terraform platform apply --destroy
 ```
 
-ECR has `force_delete=false`: a nonempty repository deliberately blocks its deletion. List the images, review that this is the assignment repository, then explicitly remove only the synthetic demo images you intend to discard:
+If deletion stalls, inspect the controller and its IAM permissions before removing it. Do not force-remove a finalizer just to complete cleanup.
+
+RDS deletion protection is enabled. In `environments/dev.json`, set `infra.db_deletion_protection=false`, keep `infra.db_skip_final_snapshot=false` when retaining data, and choose a fresh `infra.db_final_snapshot_identifier`. Then review/apply that retention change. ECR has `force_delete=false`, so explicitly delete only the reviewed demo image digests before infrastructure destruction:
 
 ```bash
-ECR_NAME="${ECR_REPOSITORY#*/}"
-aws ecr list-images --repository-name "$ECR_NAME"
-aws ecr batch-delete-image --repository-name "$ECR_NAME" --image-ids imageDigest="$IMAGE_DIGEST"
+mise run target -- --env dev terraform infra plan
+mise run target -- --env dev terraform infra apply
+mise run target -- --env dev aws ecr list-images --repository-name "$ECR_NAME"
+mise run target -- --env dev aws ecr batch-delete-image --repository-name "$ECR_NAME" --image-ids imageDigest="$IMAGE_DIGEST"
+mise run target -- --env dev terraform infra plan --destroy
+mise run target -- --env dev terraform infra apply --destroy
 ```
 
-Repeat for any other reviewed demo image digests. Do not delete images needed by another deployment. Then review and apply infrastructure destruction:
+Repeat image deletion for any other reviewed demo digests. Verify the selected account/Region for retained or leftover resources. Snapshots and state storage can continue charging; preserve the state bucket and bootstrap state until deletion and recovery requirements are confirmed. See [cost and cleanup](docs/cost-and-cleanup.md). Test/prod cleanup uses its own explicit target and private artifacts; dev commands do not clean up those accounts.
 
-```bash
-terraform -chdir=infra plan -destroy -out=../.local/infra-destroy.tfplan
-terraform -chdir=infra show ../.local/infra-destroy.tfplan
-terraform -chdir=infra apply ../.local/infra-destroy.tfplan
-```
-
-Check the Region for leftover ALBs, target groups, ENIs, NAT Gateways, EIPs, EBS volumes, RDS resources, snapshots and logs. Retained snapshots and state storage can continue charging. Keep the state bucket and bootstrap state until deletion is confirmed and the desired recovery history is retained. Bucket versioning retains old object versions; destroying application infrastructure does not empty it. [Full retention checklist](docs/cost-and-cleanup.md)
-
-The public repository contains source, synthetic test evidence and the presentation. Assignment correspondence, the source attachment, credentials, state, plans and real deployment inputs are excluded.
+The public repository contains source, synthetic test evidence and the presentation. Real environment inputs, correspondence, credentials, state, plans and outputs are excluded.

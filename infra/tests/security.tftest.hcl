@@ -26,11 +26,17 @@ override_data {
   values = { version = "17.6" }
 }
 variables {
+  environment         = "dev"
+  aws_account_id      = "123456789012"
   admin_cidrs         = ["203.0.113.10/32"]
   admin_principal_arn = "arn:aws:iam::123456789012:role/example-admin"
 }
 run "private_tiers_and_minimum_database_access" {
   command = plan
+  assert {
+    condition     = aws_eks_cluster.main.name == "contoso-dev" && aws_db_instance.main.identifier == "contoso-dev" && aws_ecr_repository.app.name == "contoso-dev-app"
+    error_message = "Dev resource names must be explicitly environment-qualified."
+  }
   assert {
     condition     = length(aws_subnet.compute) == 2 && length(aws_subnet.database) == 2 && alltrue([for s in aws_subnet.compute : !s.map_public_ip_on_launch]) && alltrue([for s in aws_subnet.database : !s.map_public_ip_on_launch])
     error_message = "EKS and DB need separate private subnet tiers in two AZs."
@@ -75,13 +81,16 @@ run "private_tiers_and_minimum_database_access" {
 run "private_only_api_and_ha_egress_are_explicit_options" {
   command = plan
   variables {
-    private_only_api = true
-    nat_per_az       = true
-    db_multi_az      = true
-    enable_waf       = false
+    environment         = "prod"
+    aws_account_id      = "345678901234"
+    admin_principal_arn = "arn:aws:iam::345678901234:role/example-admin"
+    private_only_api    = true
+    nat_per_az          = true
+    db_multi_az         = true
+    enable_waf          = false
   }
   assert {
-    condition     = !aws_eks_cluster.main.vpc_config[0].endpoint_public_access && aws_eks_cluster.main.vpc_config[0].endpoint_private_access && length(aws_nat_gateway.main) == 2 && aws_db_instance.main.multi_az && length(aws_wafv2_web_acl.main) == 0
+    condition     = aws_eks_cluster.main.name == "contoso-prod" && aws_launch_template.nodes.tag_specifications[0].tags["Environment"] == "prod" && aws_launch_template.nodes.tag_specifications[0].tags["Purpose"] == "platform" && !aws_eks_cluster.main.vpc_config[0].endpoint_public_access && aws_eks_cluster.main.vpc_config[0].endpoint_private_access && length(aws_nat_gateway.main) == 2 && aws_db_instance.main.multi_az && length(aws_wafv2_web_acl.main) == 0
     error_message = "Production-oriented options must actually alter the resources."
   }
 }
@@ -99,4 +108,32 @@ run "reject_vpc_that_makes_alb_subnets_too_small" {
   command = plan
   variables { vpc_cidr = "10.42.0.0/20" }
   expect_failures = [var.vpc_cidr]
+}
+
+run "test_environment_has_separate_resource_names" {
+  command = plan
+  variables {
+    environment         = "test"
+    aws_account_id      = "234567890123"
+    admin_principal_arn = "arn:aws:iam::234567890123:role/example-admin"
+  }
+  assert {
+    condition     = aws_eks_cluster.main.name == "contoso-test" && aws_db_instance.main.identifier == "contoso-test" && aws_iam_role.irsa["app"].name == "contoso-test-app"
+    error_message = "Test must use its own cluster, DB and application role names."
+  }
+}
+run "reject_unknown_environment" {
+  command = plan
+  variables { environment = "staging" }
+  expect_failures = [var.environment]
+}
+run "reject_invalid_account_id" {
+  command = plan
+  variables { aws_account_id = "not-an-account" }
+  expect_failures = [var.aws_account_id]
+}
+run "reject_admin_from_another_account" {
+  command = plan
+  variables { admin_principal_arn = "arn:aws:iam::234567890123:role/foreign-admin" }
+  expect_failures = [var.admin_principal_arn]
 }

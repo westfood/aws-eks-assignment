@@ -17,7 +17,7 @@ locals {
 }
 resource "aws_iam_role" "irsa" {
   for_each = local.service_accounts
-  name     = "${var.name}-${each.key}"
+  name     = "${local.name}-${each.key}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -36,7 +36,7 @@ resource "aws_iam_role_policy_attachment" "cni" {
 }
 # Pinned upstream policy; see policies/README.md for provenance and scope rationale.
 resource "aws_iam_policy" "controller" {
-  name   = "${var.name}-load-balancer-controller"
+  name   = "${local.name}-load-balancer-controller"
   policy = file("${path.module}/policies/aws-load-balancer-controller-v2.14.1.json")
 }
 resource "aws_iam_role_policy_attachment" "controller" {

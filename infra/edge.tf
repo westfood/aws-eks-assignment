@@ -1,6 +1,6 @@
 resource "aws_wafv2_web_acl" "main" {
   count       = var.enable_waf ? 1 : 0
-  name        = "${var.name}-web"
+  name        = "${local.name}-web"
   description = "Demo edge protection; not a substitute for authentication or application validation"
   scope       = "REGIONAL"
   default_action {
@@ -21,7 +21,7 @@ resource "aws_wafv2_web_acl" "main" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       sampled_requests_enabled   = false
-      metric_name                = "${var.name}-common"
+      metric_name                = "${local.name}-common"
     }
   }
   rule {
@@ -39,17 +39,17 @@ resource "aws_wafv2_web_acl" "main" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       sampled_requests_enabled   = false
-      metric_name                = "${var.name}-rate"
+      metric_name                = "${local.name}-rate"
     }
   }
   visibility_config {
     cloudwatch_metrics_enabled = true
     sampled_requests_enabled   = false
-    metric_name                = "${var.name}-web"
+    metric_name                = "${local.name}-web"
   }
 }
 resource "aws_ecr_repository" "app" {
-  name                 = "${var.name}-app"
+  name                 = "${local.name}-app"
   image_tag_mutability = "IMMUTABLE"
   force_delete         = false
   image_scanning_configuration { scan_on_push = true }

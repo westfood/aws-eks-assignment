@@ -1,6 +1,18 @@
 # Interview walkthrough
 
-Use the presentation for the stakeholder discussion. Use this walkthrough for the technical demonstration and follow-up questions. State explicitly whether the environment has been deployed to AWS or only checked locally.
+Use the presentation for the stakeholder discussion. The live technical demonstration targets **dev only**. Use this walkthrough for the demonstration and follow-up questions, and state explicitly whether dev has been deployed to AWS or only checked locally. Test and prod remain separate deployment targets; see [environment targeting](environments.md).
+
+## Confirm the dev target
+
+After configuring and authenticating the dev profile, inspect the target and check the account before demonstrating it:
+
+```bash
+mise run target -- --env dev show
+mise run target -- --env dev check
+mise run demo
+```
+
+The `demo` convenience task is fixed to dev. Its read-only checks do not deploy resources; complete the root README’s dev deployment sequence first. Do not run test/prod plan, apply or cleanup commands during the presentation.
 
 ## Explain the purpose
 
@@ -16,7 +28,7 @@ Show [the architecture](architecture.md) and identify the two AZs, three subnet 
 4. `platform/` installs the controller and application resources. A separate Job initializes database privileges and schema.
 5. The controller reconciles the Ingress into an ALB and registers healthy Pod IP targets.
 
-Use the root README's commands. Run and inspect a plan before applying it. Do not pass a database password through command-line flags or publish state/plan files.
+Use the root README's commands with `--env dev`. Review the printed plan before applying its saved plan. Inputs, backend initialization, state and plans are isolated by environment. Do not pass a database password through command-line flags or publish state/plan files.
 
 ## Show the running application
 

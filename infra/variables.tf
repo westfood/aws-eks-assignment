@@ -1,9 +1,10 @@
 variable "name" {
-  type    = string
-  default = "contoso-demo"
+  description = "Base project name; the environment suffix is appended automatically."
+  type        = string
+  default     = "contoso"
   validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{2,23}$", var.name))
-    error_message = "Use 3–24 lowercase letters, numbers or hyphens, starting with a letter."
+    condition     = can(regex("^[a-z][a-z0-9-]{1,22}[a-z0-9]$", var.name)) && !strcontains(var.name, "--")
+    error_message = "Use 3–24 lowercase letters, numbers or hyphens, starting with a letter and ending with a letter/number; consecutive hyphens are rejected."
   }
 }
 variable "aws_region" {
@@ -35,8 +36,10 @@ variable "admin_principal_arn" {
   description = "Existing IAM role/user ARN allowed to administer this EKS cluster. An STS assumed-role session ARN is not valid."
   type        = string
   validation {
-    condition     = can(regex("^arn:aws:iam::[0-9]{12}:(role|user)/.+$", var.admin_principal_arn))
-    error_message = "Use an IAM role/user ARN in the commercial AWS partition, not an STS session ARN."
+    condition = can(regex("^arn:aws:iam::[0-9]{12}:(role|user)/.+$", var.admin_principal_arn)) && (
+      can(regex("^[0-9]{12}$", var.aws_account_id)) ? startswith(var.admin_principal_arn, "arn:aws:iam::${var.aws_account_id}:") : true
+    )
+    error_message = "Use an IAM role/user ARN in the selected AWS account, not an STS session ARN."
   }
 }
 variable "private_only_api" {
@@ -91,7 +94,7 @@ variable "db_skip_final_snapshot" {
   default     = false
 }
 variable "db_final_snapshot_identifier" {
-  description = "Optional unique final snapshot name for cleanup. Null uses <name>-final; choose a fresh name if that snapshot already exists."
+  description = "Optional unique final snapshot name for cleanup. Null uses <name>-<environment>-final; choose a fresh name if that snapshot already exists."
   type        = string
   default     = null
   validation {

@@ -128,7 +128,7 @@
         <mxCell id="n-title" value="Contoso application platform" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=36;fontStyle=1;fontColor=#182C40;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="50" y="27" width="1430" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="n-sub" value="AWS design • Two Availability Zones • Private compute and database" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=20;fontStyle=0;fontColor=#52677A;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
+        <mxCell id="n-sub" value="Dev account demo • Two Availability Zones • Private compute and isolated database" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=20;fontStyle=0;fontColor=#52677A;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="52" y="87" width="1510" height="30" as="geometry" />
         </mxCell>
         <mxCell id="n-status" value="Design — live AWS verification pending" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fillColor=#F3F7F7;strokeColor=#B9C8D3;strokeWidth=1.6;fontFamily=Arial;fontSize=17;fontColor=#182C40;verticalAlign=top;align=left;spacing=16;dashed=0;" vertex="1" parent="1">
@@ -389,7 +389,7 @@
         <mxCell id="i-title" value="Application identity and database bootstrap" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=36;fontStyle=1;fontColor=#182C40;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="50" y="28" width="1780" height="52" as="geometry" />
         </mxCell>
-        <mxCell id="i-sub" value="Separate identities for serving requests and initializing the database" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=20;fontStyle=0;fontColor=#52677A;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
+        <mxCell id="i-sub" value="Dev account demo • Separate identities for serving requests and initializing the database" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=20;fontStyle=0;fontColor=#52677A;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="52" y="90" width="1700" height="31" as="geometry" />
         </mxCell>
         <mxCell id="i-status" value="Design — live IAM / RDS TLS verification pending" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fillColor=#F3F7F7;strokeColor=#B9C8D3;strokeWidth=1.6;fontFamily=Arial;fontSize=17;fontColor=#182C40;verticalAlign=top;align=left;spacing=16;dashed=0;" vertex="1" parent="1">

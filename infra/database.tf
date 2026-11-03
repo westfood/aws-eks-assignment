@@ -4,7 +4,7 @@ data "aws_rds_engine_version" "postgres" {
   latest  = true
 }
 resource "aws_security_group" "database" {
-  name_prefix = "${var.name}-db-"
+  name_prefix = "${local.name}-db-"
   description = "PostgreSQL reachable only from the EKS worker security group"
   vpc_id      = aws_vpc.main.id
 }
@@ -17,11 +17,11 @@ resource "aws_vpc_security_group_ingress_rule" "database_from_eks" {
   description                  = "EKS workers to PostgreSQL only; app identity is separately restricted by IAM and SQL grants"
 }
 resource "aws_db_subnet_group" "main" {
-  name       = "${var.name}-database"
+  name       = "${local.name}-database"
   subnet_ids = [for s in aws_subnet.database : s.id]
 }
 resource "aws_db_parameter_group" "main" {
-  name_prefix = "${var.name}-"
+  name_prefix = "${local.name}-"
   family      = "postgres${split(".", data.aws_rds_engine_version.postgres.version)[0]}"
   parameter {
     name  = "rds.force_ssl"
@@ -30,7 +30,7 @@ resource "aws_db_parameter_group" "main" {
   lifecycle { create_before_destroy = true }
 }
 resource "aws_db_instance" "main" {
-  identifier                          = var.name
+  identifier                          = local.name
   engine                              = "postgres"
   engine_version                      = data.aws_rds_engine_version.postgres.version
   engine_lifecycle_support            = "open-source-rds-extended-support-disabled"
@@ -55,7 +55,7 @@ resource "aws_db_instance" "main" {
   apply_immediately                   = false
   deletion_protection                 = var.db_deletion_protection
   skip_final_snapshot                 = var.db_skip_final_snapshot
-  final_snapshot_identifier           = coalesce(var.db_final_snapshot_identifier, "${var.name}-final")
+  final_snapshot_identifier           = coalesce(var.db_final_snapshot_identifier, "${local.name}-final")
   enabled_cloudwatch_logs_exports     = ["postgresql", "upgrade"]
   # There is intentionally no password argument or secret value read by Terraform.
 }

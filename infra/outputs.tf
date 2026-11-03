@@ -1,3 +1,5 @@
+output "environment" { value = var.environment }
+output "aws_account_id" { value = var.aws_account_id }
 output "region" { value = var.aws_region }
 output "cluster_name" { value = aws_eks_cluster.main.name }
 output "cluster_endpoint" { value = aws_eks_cluster.main.endpoint }

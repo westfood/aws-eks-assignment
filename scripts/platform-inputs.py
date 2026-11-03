@@ -13,7 +13,7 @@ import tempfile
 OUTPUTS = {
     "aws_region": "region",
     **{key: key for key in (
-        "cluster_name", "cluster_endpoint", "cluster_ca", "vpc_id",
+        "environment", "aws_account_id", "cluster_name", "cluster_endpoint", "cluster_ca", "vpc_id",
         "public_subnet_ids", "public_subnet_cidrs", "database_subnet_cidrs",
         "database_host", "database_name", "database_user", "bootstrap_secret_arn",
         "app_role_arn", "bootstrap_role_arn", "controller_role_arn", "waf_acl_arn",
@@ -31,6 +31,8 @@ def build_inputs(outputs, image, ingress_cidrs=None, replicas=2):
         result = {target: outputs[source]["value"] for target, source in OUTPUTS.items()}
     except (KeyError, TypeError) as error:
         raise ValueError(f"Missing/malformed Terraform output: {error}") from error
+    if result["environment"] not in ("dev", "test", "prod") or not re.fullmatch(r"[0-9]{12}", str(result["aws_account_id"])):
+        raise ValueError("Infrastructure outputs need valid environment and AWS account metadata")
     if bool(result["certificate_arn"]) != bool(result["app_hostname"]):
         raise ValueError("A certificate and owned hostname must be supplied together")
     cidrs = ingress_cidrs if ingress_cidrs is not None else result["admin_cidrs"]
@@ -69,7 +71,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--infra-outputs", type=Path, required=True)
     parser.add_argument("--image", required=True)
-    parser.add_argument("--output", type=Path, default=Path("platform/terraform.tfvars.json"))
+    parser.add_argument("--output", type=Path, required=True, help="Private path for the selected environment")
     parser.add_argument("--ingress-cidr", action="append", dest="ingress_cidrs")
     parser.add_argument("--replicas", type=int, default=2)
     parser.add_argument("--overwrite", action="store_true")

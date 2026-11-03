@@ -1,0 +1,28 @@
+{
+  "environment": "test",
+  "aws_account_id": "REPLACE_WITH_TEST_ACCOUNT_ID",
+  "aws_profile": "contoso-test",
+  "aws_region": "eu-central-1",
+  "state_bucket_name": "replace-with-unique-test-state-bucket",
+  "infra": {
+    "name": "contoso",
+    "admin_cidrs": [
+      "203.0.113.10/32"
+    ],
+    "admin_principal_arn": "arn:aws:iam::123456789012:role/replace-with-selected-account-role",
+    "vpc_cidr": "10.43.0.0/16",
+    "kubernetes_version": "1.36",
+    "postgres_engine_version": "17",
+    "node_count": 2,
+    "node_instance_types": [
+      "t3.medium"
+    ],
+    "db_instance_class": "db.t4g.small",
+    "nat_per_az": true,
+    "db_multi_az": true,
+    "db_deletion_protection": true,
+    "db_skip_final_snapshot": false,
+    "enable_waf": true,
+    "private_only_api": false
+  }
+}
