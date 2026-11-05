@@ -171,7 +171,7 @@
           <mxGeometry x="50" y="190" width="220" height="145" as="geometry" />
         </mxCell>
         <mxCell id="n-admin-lines" value="Terraform / Helm / kubectl&lt;br&gt;AWS identity + kubeconfig" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#52677A;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
-          <mxGeometry x="68" y="241" width="184" height="70" as="geometry" />
+          <mxGeometry x="68" y="241" width="184" height="90" as="geometry" />
         </mxCell>
         <mxCell id="n-browser-icon" value="" style="sketch=0;outlineConnect=0;gradientColor=none;fillColor=#5A6C86;strokeColor=none;dashed=0;html=1;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;align=center;shape=mxgraph.aws4.illustration_desktop;" vertex="1" parent="1">
           <mxGeometry x="112" y="415" width="76" height="76" as="geometry" />

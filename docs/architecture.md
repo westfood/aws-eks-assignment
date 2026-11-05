@@ -6,7 +6,7 @@ The diagrams show the **dev** environment. Test and prod are the same design in 
 
 ![Identity and database access](architecture-identity.png)
 
-[architecture.drawio](architecture.drawio) is the editable source, with two pages and native AWS icons. Open it in draw.io (web or Desktop). After editing, `mise run diagrams:export` re-exports the PNG/SVG files; this needs draw.io Desktop. [architecture.mmd](architecture.mmd) is a text-only overview.
+[architecture.drawio](architecture.drawio) is the editable source, with two pages and native AWS icons. Open it in draw.io (web or Desktop). After editing, re-export the PNG/SVG files with `mise run diagrams:export` (draw.io Desktop) or with **File › Export as** in the web app: one page at a time, border 24, diagram included. [architecture.mmd](architecture.mmd) is a text-only overview.
 
 ## Request path
 
