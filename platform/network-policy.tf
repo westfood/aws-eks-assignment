@@ -48,7 +48,7 @@ resource "kubernetes_network_policy_v1" "database_clients" {
     policy_types = ["Egress"]
     egress {
       dynamic "to" {
-        for_each = var.database_subnet_cidrs
+        for_each = local.infra.database_subnet_cidrs
         content {
           ip_block { cidr = to.value }
         }
@@ -58,7 +58,17 @@ resource "kubernetes_network_policy_v1" "database_clients" {
         protocol = "TCP"
       }
     }
-    # Regional STS (IRSA) and Secrets Manager bootstrap use HTTPS via NAT.
+    # EKS Pod Identity agent on the node supplies AWS credentials.
+    egress {
+      to {
+        ip_block { cidr = "169.254.170.23/32" }
+      }
+      ports {
+        port     = "80"
+        protocol = "TCP"
+      }
+    }
+    # RDS auth tokens are signed locally; Secrets Manager (bootstrap) uses HTTPS via NAT.
     # Dedicated VPC endpoints + endpoint SGs would narrow this further in production.
     egress {
       to {
@@ -81,7 +91,7 @@ resource "kubernetes_network_policy_v1" "app_ingress" {
     policy_types = ["Ingress"]
     ingress {
       dynamic "from" {
-        for_each = var.public_subnet_cidrs
+        for_each = local.infra.public_subnet_cidrs
         content {
           ip_block { cidr = from.value }
         }

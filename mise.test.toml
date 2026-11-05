@@ -1,0 +1,13 @@
+# test environment, selected with `mise -E test run <task>`. Its own AWS account and Terraform state.
+# Account-specific values (account ID, your IP) go in git-ignored mise.test.local.toml; see README.
+[env]
+DEPLOY_ENV = "test"
+AWS_PROFILE = "contoso-test-admin"
+AWS_REGION = "eu-north-1"
+KUBECONFIG = "{{config_root}}/.kube/test"
+TF_VAR_environment = "test"
+TF_VAR_aws_region = "eu-north-1"
+TF_VAR_vpc_cidr = "10.43.0.0/16"
+# Production-like availability so releases are tested the way prod runs.
+TF_VAR_nat_per_az = "true"
+TF_VAR_db_multi_az = "true"

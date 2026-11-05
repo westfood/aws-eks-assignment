@@ -1,0 +1,17 @@
+# dev environment, selected with `mise -E dev run <task>`. Its own AWS account and Terraform state.
+# Account-specific values (account ID, your IP) go in git-ignored mise.dev.local.toml; see README.
+[env]
+DEPLOY_ENV = "dev"
+AWS_PROFILE = "contoso-dev-admin"
+AWS_REGION = "eu-north-1"
+KUBECONFIG = "{{config_root}}/.kube/dev"
+TF_VAR_environment = "dev"
+TF_VAR_aws_region = "eu-north-1"
+TF_VAR_vpc_cidr = "10.42.0.0/16"
+# Cost-saving demo choices: one NAT gateway, Single-AZ database.
+TF_VAR_nat_per_az = "false"
+TF_VAR_db_multi_az = "false"
+# Dev is disposable: synthetic data only, so a single destroy removes the DB and images.
+TF_VAR_db_deletion_protection = "false"
+TF_VAR_db_skip_final_snapshot = "true"
+TF_VAR_ecr_force_delete = "true"

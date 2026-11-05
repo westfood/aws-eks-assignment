@@ -1,6 +1,10 @@
 terraform {
   required_version = ">= 1.14, < 2.0"
-  backend "s3" {}
+  # bucket, key and region are passed by scripts/tf.sh for the selected environment.
+  backend "s3" {
+    encrypt      = true
+    use_lockfile = true
+  }
   required_providers {
     kubernetes = { source = "hashicorp/kubernetes", version = "~> 2.38" }
     helm       = { source = "hashicorp/helm", version = "~> 3.0" }
@@ -12,7 +16,7 @@ provider "aws" {
   allowed_account_ids = [var.aws_account_id]
   default_tags {
     tags = {
-      Project = var.cluster_name, Environment = var.environment, ManagedBy = "terraform"
+      Project = local.infra.cluster_name, Environment = var.environment, ManagedBy = "terraform"
       Purpose = var.environment == "dev" ? "interview" : "platform"
     }
   }
@@ -23,7 +27,7 @@ provider "kubernetes" {
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", var.cluster_name, "--region", var.aws_region]
+    args        = ["eks", "get-token", "--cluster-name", local.infra.cluster_name, "--region", var.aws_region]
   }
 }
 provider "helm" {
@@ -33,7 +37,7 @@ provider "helm" {
     exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", var.cluster_name, "--region", var.aws_region]
+      args        = ["eks", "get-token", "--cluster-name", local.infra.cluster_name, "--region", var.aws_region]
     }
   }
 }

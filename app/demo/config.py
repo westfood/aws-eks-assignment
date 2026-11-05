@@ -38,7 +38,7 @@ class Settings:
         password = os.environ.get("DB_PASSWORD")
         if auth == "password" and not password:
             raise ValueError("DB_PASSWORD is required for password authentication")
-        region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
+        region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION", "eu-north-1")
         return cls(
             host=host,
             port=port,

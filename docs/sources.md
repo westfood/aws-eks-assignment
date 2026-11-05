@@ -1,11 +1,11 @@
 # Sources
 
-Primary technical documentation reviewed on **3 November 2026**. These references support the design and discussion, not a claim that AWS integration has already been tested.
+Primary documentation behind the design, last reviewed 5 November 2026.
 
 ## Development toolchain
 
 - [mise getting started](https://mise.jdx.dev/getting-started.html): project tool configuration, installation, trust and task discovery.
-- [mise environment command](https://mise.jdx.dev/cli/env.html): loading the project environment once into the current shell.
+- [mise config environments](https://mise.jdx.dev/configuration/environments.html): `mise -E dev` loads `mise.dev.toml` and `mise.dev.local.toml`.
 - [mise continuous integration](https://mise.jdx.dev/continuous-integration.html): using the project tool configuration in CI.
 
 ## Diagram format and icons
@@ -17,16 +17,15 @@ Primary technical documentation reviewed on **3 November 2026**. These reference
 
 ## Account access
 
-- [AWS CLI browser login and credential-process sharing](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html): temporary development credentials without long-lived access keys, CLI version and sign-in permission requirements.
-- [AWS CLI IAM Identity Center setup](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html): alternative SSO profile configuration and renewal.
-- [Enable Identity Center](https://docs.aws.amazon.com/singlesignon/latest/userguide/enable-identity-center.html): organization/account-instance scope and the free-tier plan/credit consequence of creating an organization.
-- [Root-user guidance](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html): separate account setup from routine deployment identity.
+- [AWS CLI browser login](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html): `aws login` temporary credentials, refreshed by the CLI and SDKs (including Terraform's).
+- [Supported services for the new AWS experience](https://docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html): EKS, RDS, ECR, ELB, WAF, ACM and Route 53 are in the Free Tier; Organizations and Identity Center are not.
+- [SCPs for projects](https://docs.aws.amazon.com/accounts/latest/reference/scps-and-rcps-for-projects.html): the `iam:*Provider*` deny that rules out IRSA, and the denied Shield API.
 
 ## AWS network and EKS
 
 - [EKS VPC and subnet requirements](https://docs.aws.amazon.com/eks/latest/userguide/network-reqs.html): two-AZ subnet requirement, DNS, IP capacity and private-node networking.
 - [EKS Kubernetes API endpoint access](https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html): private access, restricted public access and private-only administration.
-- [EKS IAM roles for service accounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html): workload identity, trust and instance-metadata caveats.
+- [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html): per-service-account IAM roles without an OIDC provider; agent address `169.254.170.23`.
 - [VPC CNI NetworkPolicy considerations](https://docs.aws.amazon.com/eks/latest/userguide/cni-network-policy.html): controller-owned Pods, Service/container port compatibility and policy-enforcement limits.
 - [AWS Load Balancer Controller Ingress annotations](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/): IP targets, listeners, security groups, health checks, ACM and WAF associations.
 - [RDS security groups](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html): allowed sources, ports and source-security-group semantics.
@@ -52,35 +51,3 @@ Primary technical documentation reviewed on **3 November 2026**. These reference
 - [AWS WAF](https://docs.aws.amazon.com/waf/latest/developerguide/what-is-aws-waf.html): application request filtering.
 - [AWS Shield](https://docs.aws.amazon.com/waf/latest/developerguide/shield-chapter.html): Standard and Advanced protection scopes.
 - [CloudFront Origin Access Control for S3](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html): proposed private-origin frontend architecture.
-
-## Container image security
-
-- [ECR scanning comparison](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html): Basic versus Enhanced scope and the `DescribeImageScanFindings` results API.
-- [ECR Basic scanning](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-basic.html): OS coverage, scan frequency and per-image scan limits.
-- [AWS-native Basic scanning announcement](https://aws.amazon.com/about-aws/whats-new/2024/08/new-version-amazon-ecr-basic-scanning/): availability without additional scanning cost.
-- [ECR Enhanced scanning](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-enhanced.html): Inspector integration, language packages, charges and unmatched repositories.
-- [ECR filter behavior](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-filters.html): prefix/wildcard semantics and unmatched repository settings.
-- [Inspector ECR scanning](https://docs.aws.amazon.com/inspector/latest/user/scanning-ecr.html): event-driven scans, account-dependent eligibility defaults and supported media types.
-- [ECR scan status](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_ImageScanStatus.html), [paginated findings](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImageScanFindings.html): release-gate response fields.
-- [Pinned Terraform ECR registry resource](https://github.com/hashicorp/terraform-provider-aws/blob/v6.71.0/website/docs/r/ecr_registry_scanning_configuration.html.markdown): account/Region policy ownership and reset-to-Basic destroy behavior.
-- [ECR managed signing](https://docs.aws.amazon.com/AmazonECR/latest/userguide/managed-signing.html), [EKS signature verification](https://docs.aws.amazon.com/eks/latest/userguide/image-verification.html): AWS Signer plus separately configured Kubernetes admission enforcement.
-- [GuardDuty EKS Runtime Monitoring](https://docs.aws.amazon.com/guardduty/latest/ug/how-runtime-monitoring-works-eks.html): agent deployment, supported compute and account-wide scope.
-- [Inspector Security Hub CSPM integration](https://docs.aws.amazon.com/inspector/latest/user/securityhub-integration.html), [Inspector EventBridge events](https://docs.aws.amazon.com/inspector/latest/user/eventbridge-integration.html): optional finding aggregation and notifications.
-- [Inspector CI/CD integration](https://docs.aws.amazon.com/inspector/latest/user/scanning-cicd.html): SBOM Generator, Scan API and supported pipeline integrations.
-
-## Cost
-
-- [AWS Pricing Calculator](https://calculator.aws/)
-- [EKS pricing](https://aws.amazon.com/eks/pricing/)
-- [EC2 On-Demand pricing](https://aws.amazon.com/ec2/pricing/on-demand/)
-- [VPC, NAT Gateway and public IPv4 pricing](https://aws.amazon.com/vpc/pricing/)
-- [RDS PostgreSQL pricing](https://aws.amazon.com/rds/postgresql/pricing/)
-- [Elastic Load Balancing pricing](https://aws.amazon.com/elasticloadbalancing/pricing/)
-- [WAF pricing](https://aws.amazon.com/waf/pricing/)
-- [Secrets Manager pricing](https://aws.amazon.com/secrets-manager/pricing/)
-- [ECR pricing](https://aws.amazon.com/ecr/pricing/), [Inspector pricing](https://aws.amazon.com/inspector/pricing/)
-- [GuardDuty pricing](https://aws.amazon.com/guardduty/pricing/), [Security Hub pricing](https://aws.amazon.com/security-hub/pricing/)
-- [S3 pricing](https://aws.amazon.com/s3/pricing/)
-- [AWS Budgets](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html)
-
-No fixed regional total is quoted. A useful estimate must use the final selected Region, instance classes, storage, support tier, traffic, retention settings and actual account credit terms.

@@ -9,7 +9,7 @@ class DatabaseTests(unittest.TestCase):
     def setUp(self):
         self.settings = Settings(
             host="db.example.rds.amazonaws.com", port=5432, database="contoso", user="contoso_app",
-            auth="iam", region="eu-central-1", sslmode="verify-full", ca_bundle="/bundle.pem", password=None,
+            auth="iam", region="eu-north-1", sslmode="verify-full", ca_bundle="/bundle.pem", password=None,
         )
 
     @patch("demo.db.psycopg.connect")
@@ -25,7 +25,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(calls[1].kwargs["password"], "second-example-token")
         self.assertTrue(all(call.kwargs["sslmode"] == "verify-full" for call in calls))
         client.return_value.generate_db_auth_token.assert_called_with(
-            DBHostname=self.settings.host, Port=5432, DBUsername="contoso_app", Region="eu-central-1"
+            DBHostname=self.settings.host, Port=5432, DBUsername="contoso_app", Region="eu-north-1"
         )
 
     @patch("demo.db.psycopg.connect")

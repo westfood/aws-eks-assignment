@@ -1,38 +1,33 @@
-data "tls_certificate" "oidc" {
-  url = aws_eks_cluster.main.identity[0].oidc[0].issuer
-}
-resource "aws_iam_openid_connect_provider" "eks" {
-  url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.oidc.certificates[length(data.tls_certificate.oidc.certificates) - 1].sha1_fingerprint]
-}
+# EKS Pod Identity gives each service account its own IAM role. Unlike IRSA it needs no IAM OIDC
+# provider, which AWS-managed projects deny (iam:*Provider*).
 locals {
-  oidc_host = replace(aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")
-  service_accounts = {
-    cni        = "system:serviceaccount:kube-system:aws-node"
-    controller = "system:serviceaccount:kube-system:aws-load-balancer-controller"
-    app        = "system:serviceaccount:${local.namespace}:contoso-app"
-    bootstrap  = "system:serviceaccount:${local.namespace}:contoso-bootstrap"
+  pod_roles = {
+    controller = { namespace = "kube-system", service_account = "aws-load-balancer-controller" }
+    app        = { namespace = local.namespace, service_account = "contoso-app" }
+    bootstrap  = { namespace = local.namespace, service_account = "contoso-bootstrap" }
   }
 }
-resource "aws_iam_role" "irsa" {
-  for_each = local.service_accounts
+resource "aws_iam_role" "pod" {
+  for_each = local.pod_roles
   name     = "${local.name}-${each.key}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect    = "Allow", Action = "sts:AssumeRoleWithWebIdentity"
-      Principal = { Federated = aws_iam_openid_connect_provider.eks.arn }
-      Condition = { StringEquals = {
-        "${local.oidc_host}:sub" = each.value
-        "${local.oidc_host}:aud" = "sts.amazonaws.com"
-      } }
+      Effect    = "Allow", Action = ["sts:AssumeRole", "sts:TagSession"]
+      Principal = { Service = "pods.eks.amazonaws.com" }
+      Condition = {
+        StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id }
+        ArnEquals    = { "aws:SourceArn" = aws_eks_cluster.main.arn }
+      }
     }]
   })
 }
-resource "aws_iam_role_policy_attachment" "cni" {
-  role       = aws_iam_role.irsa["cni"].name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+resource "aws_eks_pod_identity_association" "pod" {
+  for_each        = local.pod_roles
+  cluster_name    = aws_eks_cluster.main.name
+  namespace       = each.value.namespace
+  service_account = each.value.service_account
+  role_arn        = aws_iam_role.pod[each.key].arn
 }
 # Pinned upstream policy; see policies/README.md for provenance and scope rationale.
 resource "aws_iam_policy" "controller" {
@@ -40,12 +35,12 @@ resource "aws_iam_policy" "controller" {
   policy = file("${path.module}/policies/aws-load-balancer-controller-v2.14.1.json")
 }
 resource "aws_iam_role_policy_attachment" "controller" {
-  role       = aws_iam_role.irsa["controller"].name
+  role       = aws_iam_role.pod["controller"].name
   policy_arn = aws_iam_policy.controller.arn
 }
 resource "aws_iam_role_policy" "app_database" {
   name = "connect-to-app-database-user"
-  role = aws_iam_role.irsa["app"].id
+  role = aws_iam_role.pod["app"].id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -56,7 +51,7 @@ resource "aws_iam_role_policy" "app_database" {
 }
 resource "aws_iam_role_policy" "bootstrap_secret" {
   name = "read-only-the-database-bootstrap-secret"
-  role = aws_iam_role.irsa["bootstrap"].id
+  role = aws_iam_role.pod["bootstrap"].id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{

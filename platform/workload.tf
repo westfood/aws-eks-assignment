@@ -2,10 +2,10 @@ locals {
   namespace = "contoso"
   db_env = {
     DB_AUTH                    = "iam"
-    DB_HOST                    = var.database_host
+    DB_HOST                    = local.infra.database_host
     DB_PORT                    = "5432"
-    DB_NAME                    = var.database_name
-    DB_USER                    = var.database_user
+    DB_NAME                    = local.infra.database_name
+    DB_USER                    = local.infra.database_user
     AWS_REGION                 = var.aws_region
     AWS_DEFAULT_REGION         = var.aws_region
     AWS_EC2_METADATA_DISABLED  = "true"
@@ -29,10 +29,6 @@ resource "kubernetes_service_account_v1" "app" {
   metadata {
     name      = "contoso-app"
     namespace = kubernetes_namespace_v1.app.metadata[0].name
-    annotations = {
-      "eks.amazonaws.com/role-arn"               = var.app_role_arn
-      "eks.amazonaws.com/sts-regional-endpoints" = "true"
-    }
   }
   automount_service_account_token = false
 }
@@ -40,10 +36,6 @@ resource "kubernetes_service_account_v1" "bootstrap" {
   metadata {
     name      = "contoso-bootstrap"
     namespace = kubernetes_namespace_v1.app.metadata[0].name
-    annotations = {
-      "eks.amazonaws.com/role-arn"               = var.bootstrap_role_arn
-      "eks.amazonaws.com/sts-regional-endpoints" = "true"
-    }
   }
   automount_service_account_token = false
 }
@@ -71,10 +63,10 @@ resource "kubernetes_job_v1" "bootstrap" {
         }
         container {
           name    = "bootstrap"
-          image   = var.app_image
+          image   = local.app_image
           command = ["python", "-m", "demo.bootstrap"]
           dynamic "env" {
-            for_each = merge(local.db_env, { BOOTSTRAP_SECRET_ARN = var.bootstrap_secret_arn, BOOTSTRAP_APP_USER = var.database_user })
+            for_each = merge(local.db_env, { BOOTSTRAP_SECRET_ARN = local.infra.bootstrap_secret_arn, BOOTSTRAP_APP_USER = local.infra.database_user })
             content {
               name  = env.key
               value = env.value
@@ -136,7 +128,7 @@ resource "kubernetes_deployment_v1" "app" {
         }
         container {
           name  = "app"
-          image = var.app_image
+          image = local.app_image
           port {
             name           = "http"
             container_port = 8080

@@ -2,10 +2,6 @@ resource "kubernetes_service_account_v1" "controller" {
   metadata {
     name      = "aws-load-balancer-controller"
     namespace = "kube-system"
-    annotations = {
-      "eks.amazonaws.com/role-arn"               = var.controller_role_arn
-      "eks.amazonaws.com/sts-regional-endpoints" = "true"
-    }
   }
 }
 resource "helm_release" "controller" {
@@ -18,12 +14,16 @@ resource "helm_release" "controller" {
   wait       = true
   timeout    = 600
   values = [yamlencode({
-    clusterName                 = var.cluster_name
+    clusterName                 = local.infra.cluster_name
     region                      = var.aws_region
-    vpcId                       = var.vpc_id
+    vpcId                       = local.infra.vpc_id
     replicaCount                = 1
     serviceAccount              = { create = false, name = kubernetes_service_account_v1.controller.metadata[0].name }
     enableServiceMutatorWebhook = false
+    # Shield is not available in AWS-managed projects and WAF Classic is retired; WAFv2 stays on.
+    enableShield = false
+    enableWaf    = false
+    enableWafv2  = true
     resources = {
       requests = { cpu = "100m", memory = "128Mi" }
       limits   = { memory = "256Mi" }

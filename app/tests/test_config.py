@@ -13,7 +13,7 @@ class SettingsTests(unittest.TestCase):
         self.environment = {
             "DB_HOST": "example.rds.amazonaws.com",
             "RDS_CA_BUNDLE": self.bundle.name,
-            "AWS_REGION": "eu-central-1",
+            "AWS_REGION": "eu-north-1",
         }
 
     def tearDown(self):

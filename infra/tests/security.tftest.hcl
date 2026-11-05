@@ -1,24 +1,19 @@
 mock_provider "aws" {
   override_during = plan
-  mock_data "aws_availability_zones" { defaults = { names = ["eu-central-1a", "eu-central-1b", "eu-central-1c"] } }
+  mock_data "aws_availability_zones" { defaults = { names = ["eu-north-1a", "eu-north-1b", "eu-north-1c"] } }
   mock_data "aws_caller_identity" { defaults = { account_id = "123456789012" } }
   mock_data "aws_eks_addon_version" { defaults = { version = "v1.20.4-eksbuild.1" } }
   mock_resource "aws_eks_cluster" {
     defaults = {
-      identity              = [{ oidc = [{ issuer = "https://oidc.eks.eu-central-1.amazonaws.com/id/EXAMPLE" }] }]
+      arn                   = "arn:aws:eks:eu-north-1:123456789012:cluster/contoso-dev"
       certificate_authority = [{ data = "dGVzdC1jYQ==" }]
     }
   }
   mock_resource "aws_db_instance" {
     defaults = {
       resource_id        = "db-ABCDEFGHIJKLMNOPQRSTU12345"
-      master_user_secret = [{ secret_arn = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:rds-example", kms_key_id = "example", secret_status = "active" }]
+      master_user_secret = [{ secret_arn = "arn:aws:secretsmanager:eu-north-1:123456789012:secret:rds-example", kms_key_id = "example", secret_status = "active" }]
     }
-  }
-}
-mock_provider "tls" {
-  mock_data "tls_certificate" {
-    defaults = { certificates = [{ sha1_fingerprint = "0123456789012345678901234567890123456789" }] }
   }
 }
 override_data {
@@ -26,10 +21,9 @@ override_data {
   values = { version = "17.6" }
 }
 variables {
-  environment         = "dev"
-  aws_account_id      = "123456789012"
-  admin_cidrs         = ["203.0.113.10/32"]
-  admin_principal_arn = "arn:aws:iam::123456789012:role/example-admin"
+  environment    = "dev"
+  aws_account_id = "123456789012"
+  admin_cidrs    = ["203.0.113.10/32"]
 }
 run "private_tiers_and_minimum_database_access" {
   command = plan
@@ -58,6 +52,10 @@ run "private_tiers_and_minimum_database_access" {
     error_message = "Default teardown settings must preserve data."
   }
   assert {
+    condition     = aws_eks_cluster.main.access_config[0].authentication_mode == "API" && aws_eks_cluster.main.access_config[0].bootstrap_cluster_creator_admin_permissions
+    error_message = "Use EKS access entries; the deploying identity is the initial cluster admin."
+  }
+  assert {
     condition     = aws_eks_cluster.main.vpc_config[0].endpoint_private_access && aws_eks_cluster.main.vpc_config[0].public_access_cidrs == toset(var.admin_cidrs)
     error_message = "EKS must have private connectivity and a restricted administrative public endpoint."
   }
@@ -66,7 +64,7 @@ run "private_tiers_and_minimum_database_access" {
     error_message = "Require IMDSv2 and prevent ordinary app Pods falling back to node credentials."
   }
   assert {
-    condition     = aws_ecr_repository.app.image_tag_mutability == "IMMUTABLE" && aws_wafv2_web_acl.main[0].scope == "REGIONAL"
+    condition     = aws_ecr_repository.app.image_tag_mutability == "IMMUTABLE" && aws_ecr_repository.app.image_scanning_configuration[0].scan_on_push && aws_wafv2_web_acl.main[0].scope == "REGIONAL"
     error_message = "Keep immutable images and regional ALB WAF protection."
   }
   assert {
@@ -74,20 +72,23 @@ run "private_tiers_and_minimum_database_access" {
     error_message = "Runtime identity must connect only as the restricted app database user."
   }
   assert {
-    condition     = jsondecode(aws_iam_role_policy.bootstrap_secret.policy).Statement[0].Action == "secretsmanager:GetSecretValue" && length(local.service_accounts) == 4 && local.service_accounts.app != local.service_accounts.bootstrap
+    condition     = jsondecode(aws_iam_role_policy.bootstrap_secret.policy).Statement[0].Action == "secretsmanager:GetSecretValue" && length(aws_eks_pod_identity_association.pod) == 3 && aws_eks_pod_identity_association.pod["app"].service_account != aws_eks_pod_identity_association.pod["bootstrap"].service_account
     error_message = "Bootstrap and runtime credentials must have separate identities and purposes."
+  }
+  assert {
+    condition     = jsondecode(aws_iam_role.pod["app"].assume_role_policy).Statement[0].Principal.Service == "pods.eks.amazonaws.com"
+    error_message = "Use EKS Pod Identity; projects deny the IAM OIDC provider that IRSA needs."
   }
 }
 run "private_only_api_and_ha_egress_are_explicit_options" {
   command = plan
   variables {
-    environment         = "prod"
-    aws_account_id      = "345678901234"
-    admin_principal_arn = "arn:aws:iam::345678901234:role/example-admin"
-    private_only_api    = true
-    nat_per_az          = true
-    db_multi_az         = true
-    enable_waf          = false
+    environment      = "prod"
+    aws_account_id   = "345678901234"
+    private_only_api = true
+    nat_per_az       = true
+    db_multi_az      = true
+    enable_waf       = false
   }
   assert {
     condition     = aws_eks_cluster.main.name == "contoso-prod" && aws_launch_template.nodes.tag_specifications[0].tags["Environment"] == "prod" && aws_launch_template.nodes.tag_specifications[0].tags["Purpose"] == "platform" && !aws_eks_cluster.main.vpc_config[0].endpoint_public_access && aws_eks_cluster.main.vpc_config[0].endpoint_private_access && length(aws_nat_gateway.main) == 2 && aws_db_instance.main.multi_az && length(aws_wafv2_web_acl.main) == 0
@@ -99,11 +100,6 @@ run "reject_open_administrative_api" {
   variables { admin_cidrs = ["0.0.0.0/0"] }
   expect_failures = [var.admin_cidrs]
 }
-run "reject_sts_session_as_cluster_principal" {
-  command = plan
-  variables { admin_principal_arn = "arn:aws:sts::123456789012:assumed-role/admin/session" }
-  expect_failures = [var.admin_principal_arn]
-}
 run "reject_vpc_that_makes_alb_subnets_too_small" {
   command = plan
   variables { vpc_cidr = "10.42.0.0/20" }
@@ -113,12 +109,11 @@ run "reject_vpc_that_makes_alb_subnets_too_small" {
 run "test_environment_has_separate_resource_names" {
   command = plan
   variables {
-    environment         = "test"
-    aws_account_id      = "234567890123"
-    admin_principal_arn = "arn:aws:iam::234567890123:role/example-admin"
+    environment    = "test"
+    aws_account_id = "234567890123"
   }
   assert {
-    condition     = aws_eks_cluster.main.name == "contoso-test" && aws_db_instance.main.identifier == "contoso-test" && aws_iam_role.irsa["app"].name == "contoso-test-app"
+    condition     = aws_eks_cluster.main.name == "contoso-test" && aws_db_instance.main.identifier == "contoso-test" && aws_iam_role.pod["app"].name == "contoso-test-app"
     error_message = "Test must use its own cluster, DB and application role names."
   }
 }
@@ -131,9 +126,4 @@ run "reject_invalid_account_id" {
   command = plan
   variables { aws_account_id = "not-an-account" }
   expect_failures = [var.aws_account_id]
-}
-run "reject_admin_from_another_account" {
-  command = plan
-  variables { admin_principal_arn = "arn:aws:iam::234567890123:role/foreign-admin" }
-  expect_failures = [var.admin_principal_arn]
 }

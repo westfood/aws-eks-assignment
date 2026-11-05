@@ -2,8 +2,8 @@ flowchart TB
     browser["Browser: frontend and JSON API"]
     operator["Administrator: Terraform, AWS identity and kubeconfig"]
     controlPlane["AWS-managed EKS control plane"]
-    appIdentity["IRSA application role: rds-db:connect only"]
-    bootstrapIdentity["Separate IRSA initialization role"]
+    appIdentity["Pod Identity application role: rds-db:connect only"]
+    bootstrapIdentity["Separate Pod Identity initialization role"]
     masterSecret["Secrets Manager: RDS-managed master secret"]
     proposedFrontend["Proposed alternative: CloudFront and private S3 frontend"]
 

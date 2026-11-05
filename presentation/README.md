@@ -12,7 +12,7 @@ The detailed architecture is also available as an [editable draw.io diagram](../
 
 ## Live demonstration
 
-The live interview presentation uses **dev only**. The repository supports separate dev, test and prod AWS accounts, but the presentation does not require deployment to test or prod. Use the dev-only demonstration commands in the [interview walkthrough](../docs/interview-walkthrough.md); environment selection and account/state boundaries are described in [environment targeting](../docs/environments.md).
+The live interview presentation uses **dev only**. The repository supports separate dev, test and prod AWS accounts, but the presentation does not require deployment to test or prod. Deployment, demo and teardown commands are in the [root README](../README.md).
 
 ## Regeneration
 

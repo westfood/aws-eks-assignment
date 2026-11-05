@@ -1,0 +1,13 @@
+# prod environment, selected with `mise -E prod run <task>`. Its own AWS account and Terraform state.
+# Account-specific values (account ID, your IP) go in git-ignored mise.prod.local.toml; see README.
+[env]
+DEPLOY_ENV = "prod"
+AWS_PROFILE = "contoso-prod-admin"
+AWS_REGION = "eu-north-1"
+KUBECONFIG = "{{config_root}}/.kube/prod"
+TF_VAR_environment = "prod"
+TF_VAR_aws_region = "eu-north-1"
+TF_VAR_vpc_cidr = "10.44.0.0/16"
+# Highly available egress and database.
+TF_VAR_nat_per_az = "true"
+TF_VAR_db_multi_az = "true"

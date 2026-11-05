@@ -5,7 +5,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="n-region" value="AWS Region  |  eu-central-1 example" style="shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_region;container=1;collapsible=0;recursiveResize=0;pointerEvents=0;html=1;whiteSpace=wrap;fillColor=none;strokeColor=#00A4A6;strokeWidth=1.8;fontFamily=Arial;fontSize=21;fontStyle=1;fontColor=#182C40;verticalAlign=top;align=left;spacingLeft=42;spacingTop=9;dashed=1;grStroke=1;" vertex="1" parent="1">
+        <mxCell id="n-region" value="AWS Region  |  eu-north-1" style="shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_region;container=1;collapsible=0;recursiveResize=0;pointerEvents=0;html=1;whiteSpace=wrap;fillColor=none;strokeColor=#00A4A6;strokeWidth=1.8;fontFamily=Arial;fontSize=21;fontStyle=1;fontColor=#182C40;verticalAlign=top;align=left;spacingLeft=42;spacingTop=9;dashed=1;grStroke=1;" vertex="1" parent="1">
           <mxGeometry x="325" y="150" width="1785" height="1040" as="geometry" />
         </mxCell>
         <mxCell id="n-vpc" value="VPC  |  10.42.0.0/16" style="shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_vpc2;container=1;collapsible=0;recursiveResize=0;pointerEvents=0;html=1;whiteSpace=wrap;fillColor=none;strokeColor=#8C4FFF;strokeWidth=1.8;fontFamily=Arial;fontSize=21;fontStyle=1;fontColor=#182C40;verticalAlign=top;align=left;spacingLeft=42;spacingTop=9;dashed=0;grStroke=1;" vertex="1" parent="1">
@@ -281,7 +281,7 @@
         <mxCell id="n-security-title" value="Security boundaries" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=21;fontStyle=1;fontColor=#182C40;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="1827" y="734" width="225" height="33" as="geometry" />
         </mxCell>
-        <mxCell id="n-security-lines" value="DB SG: EKS node SG → TCP 5432 only&lt;br&gt;&lt;br&gt;IRSA + restricted SQL grants&lt;br&gt;&lt;br&gt;Namespace NetworkPolicy&lt;br&gt;&lt;br&gt;Identity and bootstrap details: second page" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#52677A;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
+        <mxCell id="n-security-lines" value="DB SG: EKS node SG → TCP 5432 only&lt;br&gt;&lt;br&gt;Pod Identity + restricted SQL grants&lt;br&gt;&lt;br&gt;Namespace NetworkPolicy&lt;br&gt;&lt;br&gt;Identity and bootstrap details: second page" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#52677A;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="1827" y="786" width="222" height="264" as="geometry" />
         </mxCell>
         <mxCell id="n-web-label" value="Allowed client CIDRs" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=17;fontStyle=0;fontColor=#14669B;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
@@ -340,7 +340,7 @@
         <mxCell id="i-workloads" value="Kubernetes namespace: contoso" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fillColor=#F7FAFC;strokeColor=#B9C8D3;strokeWidth=1.6;fontFamily=Arial;fontSize=22;fontColor=#182C40;verticalAlign=top;align=left;spacing=16;dashed=0;spacingLeft=48;" vertex="1" parent="1">
           <mxGeometry x="80" y="300" width="500" height="610" as="geometry" />
         </mxCell>
-        <mxCell id="i-roles" value="IAM roles through IRSA" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fillColor=#F7FAFC;strokeColor=#B9C8D3;strokeWidth=1.6;fontFamily=Arial;fontSize=22;fontColor=#182C40;verticalAlign=top;align=left;spacing=16;dashed=0;" vertex="1" parent="1">
+        <mxCell id="i-roles" value="IAM roles through EKS Pod Identity" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fillColor=#F7FAFC;strokeColor=#B9C8D3;strokeWidth=1.6;fontFamily=Arial;fontSize=22;fontColor=#182C40;verticalAlign=top;align=left;spacing=16;dashed=0;" vertex="1" parent="1">
           <mxGeometry x="650" y="300" width="450" height="610" as="geometry" />
         </mxCell>
         <mxCell id="i-services" value="Managed AWS services" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fillColor=#F7FAFC;strokeColor=#B9C8D3;strokeWidth=1.6;fontFamily=Arial;fontSize=22;fontColor=#182C40;verticalAlign=top;align=left;spacing=16;dashed=0;" vertex="1" parent="1">
@@ -473,10 +473,10 @@
         <mxCell id="i-bootstrap-tcp-label" value="Bootstrap only: administrative DB connection • verified TLS" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=19;fontStyle=0;fontColor=#8653A4;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="350" y="165" width="1110" height="29" as="geometry" />
         </mxCell>
-        <mxCell id="i-app-irsa-label" value="IRSA" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#23775D;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
+        <mxCell id="i-app-irsa-label" value="Pod Identity" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#23775D;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="535" y="421" width="105" height="29" as="geometry" />
         </mxCell>
-        <mxCell id="i-bootstrap-irsa-label" value="IRSA" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#23775D;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
+        <mxCell id="i-bootstrap-irsa-label" value="Pod Identity" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#23775D;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="535" y="711" width="105" height="29" as="geometry" />
         </mxCell>
         <mxCell id="i-app-permission-label" value="DB login&lt;br&gt;permission" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=none;fillColor=none;fontFamily=Arial;fontSize=17;fontStyle=0;fontColor=#23775D;align=left;verticalAlign=middle;spacing=0;" vertex="1" parent="1">

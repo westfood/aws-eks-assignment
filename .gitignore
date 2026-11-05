@@ -25,5 +25,5 @@ mise.local.toml
 mise.local.lock
 .mise.local.toml
 .mise.local.lock
-environments/*.json
-!environments/*.example.json
+mise.*.local.toml
+.kube/

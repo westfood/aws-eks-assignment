@@ -1,9 +1,12 @@
 terraform {
   required_version = ">= 1.14, < 2.0"
-  backend "s3" {}
+  # bucket, key and region are passed by scripts/tf.sh for the selected environment.
+  backend "s3" {
+    encrypt      = true
+    use_lockfile = true
+  }
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 6.0" }
-    tls = { source = "hashicorp/tls", version = "~> 4.0" }
   }
 }
 

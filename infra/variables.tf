@@ -9,7 +9,7 @@ variable "name" {
 }
 variable "aws_region" {
   type    = string
-  default = "eu-central-1"
+  default = "eu-north-1"
 }
 variable "vpc_cidr" {
   type    = string
@@ -30,16 +30,6 @@ variable "admin_cidrs" {
       for c in var.admin_cidrs : can(cidrnetmask(c)) && try(tonumber(split("/", c)[1]) >= 24, false)
     ])
     error_message = "Provide at least one trusted IPv4 CIDR /24 or narrower; 0.0.0.0/0 is rejected."
-  }
-}
-variable "admin_principal_arn" {
-  description = "Existing IAM role/user ARN allowed to administer this EKS cluster. An STS assumed-role session ARN is not valid."
-  type        = string
-  validation {
-    condition = can(regex("^arn:aws:iam::[0-9]{12}:(role|user)/.+$", var.admin_principal_arn)) && (
-      can(regex("^[0-9]{12}$", var.aws_account_id)) ? startswith(var.admin_principal_arn, "arn:aws:iam::${var.aws_account_id}:") : true
-    )
-    error_message = "Use an IAM role/user ARN in the selected AWS account, not an STS session ARN."
   }
 }
 variable "private_only_api" {
@@ -104,6 +94,11 @@ variable "db_final_snapshot_identifier" {
     )
     error_message = "Use a 2–255 character snapshot identifier beginning with a letter, without trailing or consecutive hyphens."
   }
+}
+variable "ecr_force_delete" {
+  description = "Allow destroy to delete the repository with its images. Only for disposable environments."
+  type        = bool
+  default     = false
 }
 variable "enable_waf" {
   type    = bool

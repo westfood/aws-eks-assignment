@@ -19,9 +19,10 @@ resource "aws_eks_cluster" "main" {
   version                       = var.kubernetes_version
   bootstrap_self_managed_addons = false
   enabled_cluster_log_types     = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+  # The identity that runs `terraform apply` becomes cluster admin (the EKS default).
   access_config {
     authentication_mode                         = "API"
-    bootstrap_cluster_creator_admin_permissions = false
+    bootstrap_cluster_creator_admin_permissions = true
   }
   upgrade_policy { support_type = "STANDARD" }
   vpc_config {
@@ -32,17 +33,6 @@ resource "aws_eks_cluster" "main" {
   }
   depends_on = [aws_iam_role_policy_attachment.cluster, aws_cloudwatch_log_group.eks]
 }
-resource "aws_eks_access_entry" "admin" {
-  cluster_name  = aws_eks_cluster.main.name
-  principal_arn = var.admin_principal_arn
-  type          = "STANDARD"
-}
-resource "aws_eks_access_policy_association" "admin" {
-  cluster_name  = aws_eks_cluster.main.name
-  principal_arn = aws_eks_access_entry.admin.principal_arn
-  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-  access_scope { type = "cluster" }
-}
 resource "aws_iam_role" "nodes" {
   name = "${local.name}-nodes"
   assume_role_policy = jsonencode({
@@ -51,7 +41,7 @@ resource "aws_iam_role" "nodes" {
   })
 }
 resource "aws_iam_role_policy_attachment" "nodes" {
-  for_each   = toset(["AmazonEKSWorkerNodePolicy", "AmazonEC2ContainerRegistryPullOnly"])
+  for_each   = toset(["AmazonEKSWorkerNodePolicy", "AmazonEKS_CNI_Policy", "AmazonEC2ContainerRegistryPullOnly"])
   role       = aws_iam_role.nodes.name
   policy_arn = "arn:aws:iam::aws:policy/${each.value}"
 }
@@ -114,7 +104,7 @@ data "aws_eks_addon_version" "vpc_cni" {
   most_recent        = true
 }
 data "aws_eks_addon_version" "other" {
-  for_each           = toset(["coredns", "kube-proxy"])
+  for_each           = toset(["coredns", "kube-proxy", "eks-pod-identity-agent"])
   addon_name         = each.value
   kubernetes_version = var.kubernetes_version
   most_recent        = true
@@ -123,14 +113,13 @@ resource "aws_eks_addon" "vpc_cni" {
   cluster_name                = aws_eks_cluster.main.name
   addon_name                  = "vpc-cni"
   addon_version               = data.aws_eks_addon_version.vpc_cni.version
-  service_account_role_arn    = aws_iam_role.irsa["cni"].arn
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
   configuration_values        = jsonencode({ enableNetworkPolicy = "true" })
-  depends_on                  = [aws_iam_role_policy_attachment.cni]
+  depends_on                  = [aws_iam_role_policy_attachment.nodes]
 }
 resource "aws_eks_addon" "other" {
-  for_each                    = toset(["coredns", "kube-proxy"])
+  for_each                    = toset(["coredns", "kube-proxy", "eks-pod-identity-agent"])
   cluster_name                = aws_eks_cluster.main.name
   addon_name                  = each.value
   addon_version               = data.aws_eks_addon_version.other[each.value].version

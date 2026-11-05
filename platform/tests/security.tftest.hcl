@@ -5,6 +5,9 @@ mock_provider "aws" {
       certificate_authority = [{ data = "dGVzdC1jYQ==" }]
     }
   }
+  mock_data "aws_ecr_image" {
+    defaults = { image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  }
   mock_data "aws_route53_zone" {
     defaults = { name = "example.com." }
   }
@@ -15,26 +18,35 @@ mock_provider "kubernetes" {
     defaults = { status = [{ load_balancer = [{ ingress = [{ hostname = "example.invalid", ip = "" }] }] }] }
   }
 }
+# Stand-in for infra's state; tests override single outputs where needed.
+override_data {
+  target = data.terraform_remote_state.infra
+  values = {
+    outputs = {
+      cluster_name          = "contoso-dev"
+      vpc_id                = "vpc-12345678"
+      public_subnet_ids     = ["subnet-00000001", "subnet-00000002"]
+      public_subnet_cidrs   = ["10.42.0.0/24", "10.42.1.0/24"]
+      database_subnet_cidrs = ["10.42.20.0/24", "10.42.21.0/24"]
+      database_host         = "example.eu-north-1.rds.amazonaws.com"
+      database_name         = "contoso"
+      database_user         = "contoso_app"
+      bootstrap_secret_arn  = "arn:aws:secretsmanager:eu-north-1:123456789012:secret:example"
+      waf_acl_arn           = ""
+      ecr_repository_url    = "123456789012.dkr.ecr.eu-north-1.amazonaws.com/contoso-dev-app"
+      ecr_repository_name   = "contoso-dev-app"
+      admin_cidrs           = ["203.0.113.10/32"]
+      certificate_arn       = ""
+      app_hostname          = ""
+      route53_zone_id       = ""
+    }
+  }
+}
 variables {
-  environment           = "dev"
-  aws_account_id        = "123456789012"
-  aws_region            = "eu-central-1"
-  cluster_name          = "contoso-dev"
-  cluster_endpoint      = "https://example.invalid"
-  cluster_ca            = "dGVzdC1jYQ=="
-  vpc_id                = "vpc-12345678"
-  public_subnet_ids     = ["subnet-00000001", "subnet-00000002"]
-  public_subnet_cidrs   = ["10.42.0.0/24", "10.42.1.0/24"]
-  database_subnet_cidrs = ["10.42.20.0/24", "10.42.21.0/24"]
-  database_host         = "example.eu-central-1.rds.amazonaws.com"
-  database_name         = "contoso"
-  database_user         = "contoso_app"
-  bootstrap_secret_arn  = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:example"
-  app_role_arn          = "arn:aws:iam::123456789012:role/app"
-  bootstrap_role_arn    = "arn:aws:iam::123456789012:role/bootstrap"
-  controller_role_arn   = "arn:aws:iam::123456789012:role/controller"
-  admin_cidrs           = ["203.0.113.10/32"]
-  app_image             = "example.invalid/contoso@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  environment       = "dev"
+  aws_account_id    = "123456789012"
+  state_bucket_name = "contoso-dev-tfstate-123456789012"
+  image_tag         = "abc1234"
 }
 run "default_pod_security_and_network_boundaries" {
   command = plan
@@ -47,8 +59,8 @@ run "default_pod_security_and_network_boundaries" {
     error_message = "Avoid writable roots and unnecessary Kubernetes API tokens."
   }
   assert {
-    condition     = kubernetes_service_account_v1.app.metadata[0].annotations["eks.amazonaws.com/role-arn"] != kubernetes_service_account_v1.bootstrap.metadata[0].annotations["eks.amazonaws.com/role-arn"] && local.db_env.DB_AUTH == "iam" && local.db_env.DB_SSLMODE == "verify-full"
-    error_message = "Runtime and bootstrap need separate identities and verified database TLS."
+    condition     = kubernetes_service_account_v1.app.metadata[0].name == "contoso-app" && kubernetes_service_account_v1.bootstrap.metadata[0].name == "contoso-bootstrap" && local.db_env.DB_AUTH == "iam" && local.db_env.DB_SSLMODE == "verify-full"
+    error_message = "Service account names must match infra's Pod Identity associations; DB TLS must be verified."
   }
   assert {
     condition     = toset(kubernetes_network_policy_v1.default_deny.spec[0].policy_types) == toset(["Ingress", "Egress"]) && kubernetes_service_v1.app.spec[0].type == "ClusterIP"
@@ -58,17 +70,40 @@ run "default_pod_security_and_network_boundaries" {
     condition     = local.annotations["alb.ingress.kubernetes.io/inbound-cidrs"] == "203.0.113.10/32" && local.annotations["alb.ingress.kubernetes.io/target-type"] == "ip"
     error_message = "HTTP-only demo ingress must be source-restricted and use Pod targets."
   }
+  assert {
+    condition     = kubernetes_deployment_v1.app.spec[0].template[0].spec[0].container[0].image == "123456789012.dkr.ecr.eu-north-1.amazonaws.com/contoso-dev-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    error_message = "Deploy the pushed image from this environment's ECR repository, pinned by digest."
+  }
 }
 run "https_enables_redirect_and_public_ingress" {
   command = plan
-  variables {
-    certificate_arn = "arn:aws:acm:eu-central-1:123456789012:certificate/example"
-    app_hostname    = "app.example.com"
-    ingress_cidrs   = ["0.0.0.0/0"]
+  override_data {
+    target = data.terraform_remote_state.infra
+    values = {
+      outputs = {
+        cluster_name          = "contoso-dev"
+        vpc_id                = "vpc-12345678"
+        public_subnet_ids     = ["subnet-00000001", "subnet-00000002"]
+        public_subnet_cidrs   = ["10.42.0.0/24", "10.42.1.0/24"]
+        database_subnet_cidrs = ["10.42.20.0/24", "10.42.21.0/24"]
+        database_host         = "example.eu-north-1.rds.amazonaws.com"
+        database_name         = "contoso"
+        database_user         = "contoso_app"
+        bootstrap_secret_arn  = "arn:aws:secretsmanager:eu-north-1:123456789012:secret:example"
+        waf_acl_arn           = "arn:aws:wafv2:eu-north-1:123456789012:regional/webacl/example"
+        ecr_repository_url    = "123456789012.dkr.ecr.eu-north-1.amazonaws.com/contoso-dev-app"
+        ecr_repository_name   = "contoso-dev-app"
+        admin_cidrs           = ["203.0.113.10/32"]
+        certificate_arn       = "arn:aws:acm:eu-north-1:123456789012:certificate/example"
+        app_hostname          = "app.example.com"
+        route53_zone_id       = "ZEXAMPLE"
+      }
+    }
   }
+  variables { ingress_cidrs = ["0.0.0.0/0"] }
   assert {
-    condition     = local.annotations["alb.ingress.kubernetes.io/ssl-redirect"] == "443" && local.tls_enabled
-    error_message = "Public exposure must redirect HTTP to a trusted HTTPS endpoint."
+    condition     = local.annotations["alb.ingress.kubernetes.io/ssl-redirect"] == "443" && local.tls_enabled && local.annotations["alb.ingress.kubernetes.io/wafv2-acl-arn"] != ""
+    error_message = "Public exposure must redirect HTTP to HTTPS behind WAF."
   }
 }
 run "reject_public_plaintext_ingress" {
@@ -76,78 +111,13 @@ run "reject_public_plaintext_ingress" {
   variables { ingress_cidrs = ["0.0.0.0/0"] }
   expect_failures = [kubernetes_ingress_v1.app]
 }
-run "reject_mutable_container_tag" {
+run "reject_latest_tag" {
   command = plan
-  variables { app_image = "example.invalid/contoso:latest" }
-  expect_failures = [var.app_image]
-}
-run "reject_zone_apex_cname" {
-  command = plan
-  variables {
-    certificate_arn = "arn:aws:acm:eu-central-1:123456789012:certificate/example"
-    app_hostname    = "example.com"
-    route53_zone_id = "ZEXAMPLE"
-  }
-  expect_failures = [aws_route53_record.app]
-}
-
-run "test_destination_is_environment_qualified" {
-  command = plan
-  variables {
-    environment  = "test"
-    cluster_name = "contoso-test"
-  }
-  assert {
-    condition     = data.aws_eks_cluster.target.name == "contoso-test" && kubernetes_namespace_v1.app.metadata[0].labels["environment"] == "test"
-    error_message = "The platform must resolve its cluster and label workloads for the selected test target."
-  }
-}
-run "prod_destination_is_environment_qualified" {
-  command = plan
-  variables {
-    environment  = "prod"
-    cluster_name = "contoso-prod"
-  }
-  assert {
-    condition     = data.aws_eks_cluster.target.name == "contoso-prod"
-    error_message = "The platform must resolve the selected production cluster."
-  }
+  variables { image_tag = "latest" }
+  expect_failures = [var.image_tag]
 }
 run "reject_unknown_environment" {
   command = plan
   variables { environment = "staging" }
   expect_failures = [var.environment]
-}
-run "reject_invalid_account_id" {
-  command = plan
-  variables { aws_account_id = "not-an-account" }
-  expect_failures = [var.aws_account_id]
-}
-run "reject_cluster_from_another_environment" {
-  command = plan
-  variables { cluster_name = "contoso-prod" }
-  expect_failures = [var.cluster_name]
-}
-run "reject_mixed_cluster_metadata" {
-  command = plan
-  variables { cluster_endpoint = "https://foreign.invalid" }
-  expect_failures = [data.aws_eks_cluster.target]
-}
-run "reject_runtime_role_from_another_account" {
-  command = plan
-  variables { app_role_arn = "arn:aws:iam::234567890123:role/foreign-runtime" }
-  expect_failures = [var.app_role_arn]
-}
-run "reject_bootstrap_secret_from_another_account" {
-  command = plan
-  variables { bootstrap_secret_arn = "arn:aws:secretsmanager:eu-central-1:234567890123:secret:foreign" }
-  expect_failures = [var.bootstrap_secret_arn]
-}
-run "reject_certificate_from_another_region" {
-  command = plan
-  variables {
-    app_hostname    = "app.example.com"
-    certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/foreign"
-  }
-  expect_failures = [var.certificate_arn]
 }

@@ -1,10 +1,10 @@
 locals {
-  ingress_cidrs = var.ingress_cidrs == null ? var.admin_cidrs : var.ingress_cidrs
-  tls_enabled   = var.certificate_arn != ""
+  ingress_cidrs = var.ingress_cidrs == null ? local.infra.admin_cidrs : var.ingress_cidrs
+  tls_enabled   = local.infra.certificate_arn != ""
   annotations = merge({
     "alb.ingress.kubernetes.io/scheme"                       = "internet-facing"
     "alb.ingress.kubernetes.io/target-type"                  = "ip"
-    "alb.ingress.kubernetes.io/subnets"                      = join(",", var.public_subnet_ids)
+    "alb.ingress.kubernetes.io/subnets"                      = join(",", local.infra.public_subnet_ids)
     "alb.ingress.kubernetes.io/inbound-cidrs"                = join(",", local.ingress_cidrs)
     "alb.ingress.kubernetes.io/healthcheck-path"             = "/readyz"
     "alb.ingress.kubernetes.io/healthcheck-timeout-seconds"  = "20"
@@ -12,13 +12,13 @@ locals {
     "alb.ingress.kubernetes.io/success-codes"                = "200"
     "alb.ingress.kubernetes.io/listen-ports"                 = local.tls_enabled ? "[{\"HTTP\":80},{\"HTTPS\":443}]" : "[{\"HTTP\":80}]"
     "alb.ingress.kubernetes.io/load-balancer-attributes"     = "routing.http.drop_invalid_header_fields.enabled=true"
-    "alb.ingress.kubernetes.io/tags"                         = "Project=${var.cluster_name},Environment=${var.environment},ManagedBy=aws-load-balancer-controller"
+    "alb.ingress.kubernetes.io/tags"                         = "Project=${local.infra.cluster_name},Environment=${var.environment},ManagedBy=aws-load-balancer-controller"
     }, local.tls_enabled ? {
-    "alb.ingress.kubernetes.io/certificate-arn" = var.certificate_arn
+    "alb.ingress.kubernetes.io/certificate-arn" = local.infra.certificate_arn
     "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
     "alb.ingress.kubernetes.io/ssl-policy"      = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-    } : {}, var.waf_acl_arn != "" ? {
-    "alb.ingress.kubernetes.io/wafv2-acl-arn" = var.waf_acl_arn
+    } : {}, local.infra.waf_acl_arn != "" ? {
+    "alb.ingress.kubernetes.io/wafv2-acl-arn" = local.infra.waf_acl_arn
   } : {})
 }
 resource "kubernetes_ingress_v1" "app" {
@@ -31,7 +31,7 @@ resource "kubernetes_ingress_v1" "app" {
   spec {
     ingress_class_name = "alb"
     rule {
-      host = var.app_hostname == "" ? null : var.app_hostname
+      host = local.infra.app_hostname == "" ? null : local.infra.app_hostname
       http {
         path {
           path      = "/"
@@ -55,24 +55,24 @@ resource "kubernetes_ingress_v1" "app" {
   depends_on = [helm_release.controller, kubernetes_deployment_v1.app]
 }
 data "aws_route53_zone" "app" {
-  count   = var.route53_zone_id == "" ? 0 : 1
-  zone_id = var.route53_zone_id
+  count   = local.infra.route53_zone_id == "" ? 0 : 1
+  zone_id = local.infra.route53_zone_id
 }
 resource "aws_route53_record" "app" {
-  count   = var.route53_zone_id == "" ? 0 : 1
-  zone_id = var.route53_zone_id
-  name    = var.app_hostname
+  count   = local.infra.route53_zone_id == "" ? 0 : 1
+  zone_id = local.infra.route53_zone_id
+  name    = local.infra.app_hostname
   type    = "CNAME"
   ttl     = 60
   records = [kubernetes_ingress_v1.app.status[0].load_balancer[0].ingress[0].hostname]
   lifecycle {
     precondition {
-      condition     = lower(trimsuffix(var.app_hostname, ".")) != lower(trimsuffix(data.aws_route53_zone.app[0].name, "."))
+      condition     = lower(trimsuffix(local.infra.app_hostname, ".")) != lower(trimsuffix(data.aws_route53_zone.app[0].name, "."))
       error_message = "Use a subdomain such as demo.example.com. This CNAME record cannot use the hosted-zone apex."
     }
   }
 }
 output "alb_hostname" { value = kubernetes_ingress_v1.app.status[0].load_balancer[0].ingress[0].hostname }
 output "application_url" {
-  value = local.tls_enabled ? "https://${var.app_hostname}" : "http://${kubernetes_ingress_v1.app.status[0].load_balancer[0].ingress[0].hostname}"
+  value = local.tls_enabled ? "https://${local.infra.app_hostname}" : "http://${kubernetes_ingress_v1.app.status[0].load_balancer[0].ingress[0].hostname}"
 }

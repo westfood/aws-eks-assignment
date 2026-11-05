@@ -1,52 +1,35 @@
-# Decisions and tradeoffs
+# Decisions and trade-offs
 
-These decisions define an interview-sized demonstration. They are not a claim that the demo is a complete enterprise landing zone.
-
-| Decision | Reason | Tradeoff or production change |
+| Decision | Why | Trade-off / production change |
 | --- | --- | --- |
-| Terraform for the required deployment | Matches the assignment and makes networking, identity and application infrastructure reviewable in Git | Requires controlled state, provider pinning, review and ownership |
-| Three Terraform roots | The state bucket must exist first; Kubernetes providers need an existing cluster | More explicit deployment stages, with separate plans and state keys |
-| One VPC in two AZs | Meets EKS subnet requirements and demonstrates separation by tier | Two subnets do not guarantee that every component has an independent standby |
-| Private worker nodes | Application nodes do not need public IP addresses | Outbound dependencies need NAT or selected VPC endpoints |
-| Isolated DB subnet tier | The DB has neither public access nor a default internet route | Private routing and security groups still need testing |
-| RDS PostgreSQL | Managed backups and maintenance; straightforward SQL and a clear port boundary | More hourly cost than a local database; DB engine/version and instance support must be checked in the selected Region |
-| Single DB instance in the demo | Keeps the demonstration smaller | Production availability may require Multi-AZ, restore testing and an explicit recovery objective |
-| Single NAT Gateway in the demo | Fewer always-on resources | AZ dependency and possible cross-AZ data charges; production may use AZ-local egress |
-| ALB IP targets via AWS Load Balancer Controller | Pod target membership follows Kubernetes changes | The controller creates AWS resources asynchronously and has IAM permissions that must be scoped and monitored |
-| Frontend and API in one application | Demonstrates an end-to-end DB roundtrip without extra frontend services | A larger static frontend can move to private S3 plus CloudFront |
-| DB security group references node SG on TCP 5432 | Avoids allowing a whole VPC CIDR or maintaining node IP lists | Reachability is broader than one Pod; use app IAM authorization now and workload-specific SGs if stronger network isolation is required |
-| IRSA for app, initialization and controller roles | Distinct AWS privileges for distinct service accounts | Requires OIDC/STS connectivity and restricted access to node instance metadata |
-| IAM DB login for the app | Avoids a long-lived application password in Terraform or Kubernetes | Token generation and DB authentication need supported SDK/engine configurations and DB memory headroom |
-| Separate DB initialization Job | Administrative secret access is not part of the serving role | Initialization is another dependency to inspect when deployment fails |
-| RDS-managed master secret | Terraform does not generate or output the DB password | Secret rotation and recovery are still operational responsibilities |
-| Verified RDS TLS | Checks both encryption and the DB server's identity | CA bundle updates must be deliberate and hostname verification must remain enabled |
-| Private EKS API path plus CIDR-restricted public API | Workers use private access while a developer can deploy from an authorized external address | Private-only management requires a VPC-connected runner or workstation |
-| Optional real ACM HTTPS | Can provide verified HTTPS when a domain/certificate exists | No assumption that the applicant owns a public domain; restricted HTTP is only the synthetic-data demo fallback |
-| WAF option | Demonstrates managed request filtering and rate limiting | Additional cost and rule tuning; WAF is not user authentication |
-| No account-wide landing-zone deployment | The enterprise landing zone is the presentation scenario | A real Contoso rollout needs account/OU, identity, audit, networking and recovery requirements before implementation |
+| Terraform, three roots | The assignment asks for Terraform. The state bucket must exist first, and Kubernetes providers need an existing cluster | Three short apply steps instead of one |
+| dev/test/prod as separate AWS accounts | Strongest isolation; matches AWS multi-account guidance | One project per environment in AWS Settings. Only dev exists today |
+| mise for tools and environments | One file pins every tool version. `mise -E <env>` selects the account, profile and settings explicitly | Everyone needs mise (CI uses it too) |
+| No Terraform workspaces | Separate accounts and state buckets make the boundary visible. A workspace name alone does not | — |
+| One VPC, 2 AZs, three subnet tiers | EKS needs 2 AZs; separate tiers show the network boundaries clearly | — |
+| RDS PostgreSQL | Managed backups and patching, a clear port boundary | Single-AZ in dev; Multi-AZ in test/prod |
+| One NAT gateway in dev | Cost | AZ dependency; test/prod use one per AZ |
+| DB SG references the node SG on 5432 | No CIDR-wide rule and no IP lists to maintain | Any Pod on those nodes can reach the port; IAM auth and SQL grants restrict who can log in. Security groups for Pods if needed |
+| EKS Pod Identity (not IRSA) | No IAM OIDC provider needed; AWS-managed projects deny creating one. Simpler trust policy | Requires the Pod Identity agent add-on |
+| IAM DB auth + separate setup Job | No long-lived app password; admin secret access is limited to a one-time Job | Tokens need DB memory headroom (`db.t4g.small`, not micro) |
+| Verified TLS to RDS (`verify-full`) | Checks encryption and the server's identity | CA bundle updates must be deliberate |
+| ALB via AWS Load Balancer Controller, IP targets | Standard EKS ingress; targets follow Pods | The controller creates AWS resources; destroy the platform before infra |
+| Restricted HTTP by default, optional ACM HTTPS | The demo does not need a domain | Public access (`0.0.0.0/0`) is refused without HTTPS |
+| WAF managed rules + rate limit | Cheap, meaningful protection at the edge | Not a replacement for authentication |
+| EKS API public endpoint limited to admin IP | Deploy from a laptop without a VPN | Private-only (`private_only_api`) needs a VPC-connected runner |
+| Creator is cluster admin | The EKS default; no IAM ARN lookup needed | Add access entries for other admins or CI roles |
+| Image tag = Git commit, deployed by digest | Immutable ECR tags; the plan fails if the image is missing | Commit before building |
+| Frontend in the same container | One deployment for the demo | Real frontend: S3 + CloudFront, with `/api` to the ALB |
+| Dev is disposable | One-command teardown for a demo with synthetic data | Test/prod keep deletion protection and final snapshots |
 
-## Questions to defend clearly
+## Questions to expect
 
-**Why not just use the database master user in the application?**
+**Why not let the app use the DB master user?** The app only reads and writes messages. Schema setup and secret access belong to the one-time Job, which limits the damage if the app is compromised.
 
-The application's job is to read and write demo messages. Schema creation, account administration and secret retrieval belong to an initialization role. Keeping them separate limits the consequences of an application compromise.
+**Is the DB isolated from every other Pod?** At the network level, no: the rule trusts the node security group. The app's IAM role and SQL grants are the per-workload control. Security groups for Pods would add a network-level boundary.
 
-**Why not claim the database is isolated from every other Pod?**
+**Why not a private-only EKS API?** It is the right production choice when a VPN or in-VPC runner exists. For a laptop demo, a public endpoint restricted to one IP is the pragmatic choice, and `private_only_api = true` switches it.
 
-The DB security group authorizes the node security group, so network reachability can extend to other Pods on those nodes. The application IAM role and SQL privileges provide additional controls. Per-Pod network identity needs a stronger design, not just a different label in the diagram.
+**Do the mocked Terraform tests prove it works?** No. They prove configuration properties and input validation. Only the live smoke test proves routing, IAM and the database connection.
 
-**Why not make the EKS API private-only immediately?**
-
-That is a reasonable production choice when a VPN, connected network or in-VPC deployment runner exists. The demo makes the management path explicit and restricts its public endpoint. It does not pretend that private workload subnets and a private-only management endpoint are the same setting.
-
-**Does a successful mocked Terraform test prove the infrastructure works?**
-
-No. It can establish configuration properties and reject invalid inputs. It does not establish service availability, quotas, IAM authorization, actual routing, controller reconciliation or a successful PostgreSQL connection. The live acceptance checks remain required.
-
-**Why do the API and DB have different health checks?**
-
-Liveness answers whether the process can respond. Readiness checks whether it can serve requests, including a DB connection. A temporary DB outage should remove an unhealthy application target from traffic without necessarily restarting the process continuously.
-
-**What changes before production?**
-
-Establish availability and recovery objectives, add application authentication, enforce HTTPS with owned DNS, implement centralized logs and alerts, test restore procedures, review workload-specific network isolation and use a controlled CI identity. Scale and cost choices then follow measured requirements.
+**What changes before production?** HTTPS with a real domain, app authentication, CI with its own deploy role instead of a laptop, alerting and log retention, restore tests, and security groups for Pods if workloads need network separation.
