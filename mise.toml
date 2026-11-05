@@ -7,7 +7,7 @@ min_version = "2026.10.11"
 activate_aggressive = true
 
 [tools]
-terraform = "1.14.8"
+terraform = "1.17.1"
 python = "3.12.16"
 awscli = "2.39.3"
 kubectl = "1.36.6"

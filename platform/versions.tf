@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.14, < 2.0"
+  required_version = ">= 1.17, < 2.0"
   # bucket, key and region are passed by scripts/tf.sh for the selected environment.
   backend "s3" {
     encrypt      = true
