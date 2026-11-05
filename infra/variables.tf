@@ -43,8 +43,9 @@ variable "kubernetes_version" {
   default     = "1.36"
 }
 variable "node_instance_types" {
-  type    = list(string)
-  default = ["t3.medium"]
+  description = "t3.small is Free plan-eligible; two of them cost the same as one t3.medium."
+  type        = list(string)
+  default     = ["t3.small"]
 }
 variable "node_count" {
   type    = number
@@ -60,7 +61,7 @@ variable "nat_per_az" {
   default     = false
 }
 variable "db_instance_class" {
-  description = "IAM database authentication needs memory headroom; a small rather than micro instance is the demo default."
+  description = "IAM DB auth needs 300-1000 MiB extra memory, so small is the default. Free plan projects only allow micro."
   type        = string
   default     = "db.t4g.small"
 }

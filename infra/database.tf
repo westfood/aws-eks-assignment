@@ -27,6 +27,15 @@ resource "aws_db_parameter_group" "main" {
     name  = "rds.force_ssl"
     value = "1"
   }
+  # On 1 GiB micro instances, give IAM DB auth memory by halving shared_buffers (AWS's advice for burstable classes).
+  dynamic "parameter" {
+    for_each = endswith(var.db_instance_class, ".micro") ? ["{DBInstanceClassMemory/65536}"] : []
+    content {
+      name         = "shared_buffers"
+      value        = parameter.value
+      apply_method = "pending-reboot"
+    }
+  }
   lifecycle { create_before_destroy = true }
 }
 resource "aws_db_instance" "main" {

@@ -1,7 +1,7 @@
 resource "aws_wafv2_web_acl" "main" {
   count       = var.enable_waf ? 1 : 0
   name        = "${local.name}-web"
-  description = "Demo edge protection; not a substitute for authentication or application validation"
+  description = "Managed common rules and a per-IP rate limit for the application ALB"
   scope       = "REGIONAL"
   default_action {
     allow {}

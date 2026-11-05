@@ -11,6 +11,8 @@ TF_VAR_vpc_cidr = "10.42.0.0/16"
 # Cost-saving demo choices: one NAT gateway, Single-AZ database.
 TF_VAR_nat_per_az = "false"
 TF_VAR_db_multi_az = "false"
+# The dev project is on the AWS Free plan, which only allows micro DB classes.
+TF_VAR_db_instance_class = "db.t4g.micro"
 # Dev is disposable: synthetic data only, so a single destroy removes the DB and images.
 TF_VAR_db_deletion_protection = "false"
 TF_VAR_db_skip_final_snapshot = "true"

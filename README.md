@@ -8,7 +8,7 @@ Terraform for the hands-on part of the AWS DevOps assignment: a small web app on
 
 | Assignment item | Where |
 | --- | --- |
-| Small EKS cluster in a VPC with private subnets | [infra/network.tf](infra/network.tf), [infra/eks.tf](infra/eks.tf): 2 AZs, 2 × `t3.medium` managed nodes, no public IPs |
+| Small EKS cluster in a VPC with private subnets | [infra/network.tf](infra/network.tf), [infra/eks.tf](infra/eks.tf): 2 AZs, 2 × `t3.small` managed nodes, no public IPs |
 | Database in separate private subnets | [infra/database.tf](infra/database.tf): RDS PostgreSQL 17 in its own subnets with **no internet route** |
 | Only necessary traffic between EKS and DB | DB security group allows **TCP 5432 from the EKS node security group only**; IAM DB auth and verified TLS on top |
 | Architecture diagram | [docs/architecture.png](docs/architecture.png), editable [draw.io](docs/architecture.drawio) |
@@ -23,7 +23,7 @@ Dev, test and prod are **separate AWS accounts** (separate projects in AWS Setti
 | Settings | [mise.dev.toml](mise.dev.toml) | [mise.test.toml](mise.test.toml) | [mise.prod.toml](mise.prod.toml) |
 | AWS profile | `contoso-dev-admin` | `contoso-test-admin` | `contoso-prod-admin` |
 | NAT gateway | one (cost) | one per AZ | one per AZ |
-| RDS | Single-AZ, disposable | Multi-AZ, deletion protection | Multi-AZ, deletion protection |
+| RDS | `db.t4g.micro` (Free plan), Single-AZ, disposable | `db.t4g.small`, Multi-AZ, deletion protection | `db.t4g.small`, Multi-AZ, deletion protection |
 
 Everything runs through mise with an explicit environment: `mise -E dev run <task>`. Without `-E` there is no AWS target, so nothing touches an account by accident. [scripts/tf.sh](scripts/tf.sh) checks that the profile's account matches the environment before Terraform runs, and Terraform checks it again (`allowed_account_ids`).
 
@@ -119,7 +119,7 @@ mise -E dev run tf infra destroy
 
 The state bucket stays; it costs cents. Test and prod keep deletion protection and final snapshots, so destroying them deliberately takes two steps.
 
-**Cost (rough estimate, eu-north-1):** dev costs about **$0.30–0.35 per hour (~$8 per day)** for the EKS control plane, two nodes, NAT, ALB, RDS and WAF. The project is on the Free plan with $100 credit, so deploy shortly before the interview and destroy it afterwards. Spend is in AWS Settings › Billing.
+**Cost (rough estimate, eu-north-1):** dev costs about **$0.25–0.30 per hour (~$7 per day)** for the EKS control plane, two nodes, NAT, ALB, RDS and WAF. The project is on the Free plan with $100 credit, so deploy shortly before the interview and destroy it afterwards. Spend is in AWS Settings › Billing.
 
 ## Local checks (no AWS)
 

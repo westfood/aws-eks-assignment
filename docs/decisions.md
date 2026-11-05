@@ -11,7 +11,7 @@
 | One NAT gateway in dev | Cost | AZ dependency; test/prod use one per AZ |
 | DB SG references the node SG on 5432 | No CIDR-wide rule and no IP lists to maintain | Any Pod on those nodes can reach the port; IAM auth and SQL grants restrict who can log in. Security groups for Pods if needed |
 | EKS Pod Identity (not IRSA) | No IAM OIDC provider needed; AWS-managed projects deny creating one. Simpler trust policy | Requires the Pod Identity agent add-on |
-| IAM DB auth + separate setup Job | No long-lived app password; admin secret access is limited to a one-time Job | Tokens need DB memory headroom (`db.t4g.small`, not micro) |
+| IAM DB auth + separate setup Job | No long-lived app password; admin secret access is limited to a one-time Job | Tokens need 300-1000 MiB of DB memory: `db.t4g.small` by default; dev's Free plan forces micro, so `shared_buffers` is halved there |
 | Verified TLS to RDS (`verify-full`) | Checks encryption and the server's identity | CA bundle updates must be deliberate |
 | ALB via AWS Load Balancer Controller, IP targets | Standard EKS ingress; targets follow Pods | The controller creates AWS resources; destroy the platform before infra |
 | Restricted HTTP by default, optional ACM HTTPS | The demo does not need a domain | Public access (`0.0.0.0/0`) is refused without HTTPS |

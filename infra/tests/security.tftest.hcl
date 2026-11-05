@@ -127,3 +127,15 @@ run "reject_invalid_account_id" {
   variables { aws_account_id = "not-an-account" }
   expect_failures = [var.aws_account_id]
 }
+run "free_plan_micro_db_frees_memory_for_iam_auth" {
+  command = plan
+  variables { db_instance_class = "db.t4g.micro" }
+  assert {
+    condition     = anytrue([for p in aws_db_parameter_group.main.parameter : p.name == "shared_buffers" && p.apply_method == "pending-reboot"])
+    error_message = "Micro instances need smaller shared_buffers so IAM DB auth has memory."
+  }
+  assert {
+    condition     = can(regex("^[\\w+=:#@/\\-,.][\\w+=:#@/\\-,.\\s]+[\\w+=:#@/\\-,.]$", aws_wafv2_web_acl.main[0].description))
+    error_message = "WAF rejects descriptions outside its allowed character set (for example ';')."
+  }
+}
