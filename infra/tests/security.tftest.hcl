@@ -28,6 +28,10 @@ variables {
 run "private_tiers_and_minimum_database_access" {
   command = plan
   assert {
+    condition     = toset(keys(aws_cloudwatch_log_group.database)) == toset(aws_db_instance.main.enabled_cloudwatch_logs_exports) && aws_cloudwatch_log_group.database["postgresql"].name == "/aws/rds/instance/contoso-dev/postgresql" && alltrue([for g in aws_cloudwatch_log_group.database : g.retention_in_days == 7])
+    error_message = "Terraform must own the RDS log groups, with retention, so logs expire and destroy removes them."
+  }
+  assert {
     condition     = aws_eks_cluster.main.name == "contoso-dev" && aws_db_instance.main.identifier == "contoso-dev" && aws_ecr_repository.app.name == "contoso-dev-app"
     error_message = "Dev resource names must be explicitly environment-qualified."
   }

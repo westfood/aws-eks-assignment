@@ -38,6 +38,12 @@ resource "aws_db_parameter_group" "main" {
   }
   lifecycle { create_before_destroy = true }
 }
+# Created here rather than by RDS, so the logs expire and destroy removes the groups (after the instance).
+resource "aws_cloudwatch_log_group" "database" {
+  for_each          = toset(["postgresql", "upgrade"])
+  name              = "/aws/rds/instance/${local.name}/${each.key}"
+  retention_in_days = 7
+}
 resource "aws_db_instance" "main" {
   identifier                          = local.name
   engine                              = "postgres"
@@ -65,6 +71,6 @@ resource "aws_db_instance" "main" {
   deletion_protection                 = var.db_deletion_protection
   skip_final_snapshot                 = var.db_skip_final_snapshot
   final_snapshot_identifier           = coalesce(var.db_final_snapshot_identifier, "${local.name}-final")
-  enabled_cloudwatch_logs_exports     = ["postgresql", "upgrade"]
+  enabled_cloudwatch_logs_exports     = keys(aws_cloudwatch_log_group.database)
   # There is intentionally no password argument or secret value read by Terraform.
 }
