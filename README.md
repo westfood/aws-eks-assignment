@@ -31,7 +31,7 @@ Region is **eu-north-1**.
 
 ## Deploy dev
 
-You need [mise](https://mise.jdx.dev/getting-started.html), Git and Docker with Buildx. mise installs Terraform, AWS CLI, kubectl, Helm and Python at the versions pinned in [mise.toml](mise.toml).
+You need [mise](https://mise.jdx.dev/getting-started.html), Git and Docker with Buildx. mise installs Terraform, AWS CLI, kubectl, Python and actionlint at the versions pinned in [mise.toml](mise.toml).
 
 **1. Tools and sign-in**
 
@@ -128,7 +128,18 @@ mise run check            # app tests, Terraform fmt/validate/mocked tests, work
 docker compose up --build # app + PostgreSQL locally on http://127.0.0.1:18080
 ```
 
-CI runs the same checks plus a container smoke test on every push.
+## GitHub checks
+
+[GitHub Actions](.github/workflows/ci.yml) runs four jobs on every push and pull request. None of them uses AWS credentials.
+
+| Check | What it tests |
+| --- | --- |
+| **Toolset and lint** | Every tool in `mise.lock` installs on Linux at its pinned version and checksum; mise tasks are valid; the workflow passes actionlint; `scripts/tf.sh` parses |
+| **Application and PostgreSQL integration** | 23 app tests, 4 of them against a real PostgreSQL 17: write and read back a message, user input stored as literal data (no SQL injection), the app's DB role can't create or delete tables, setup works without a superuser. The rest cover health checks, input validation, error hiding, security headers, enforced TLS to the DB and fresh IAM tokens per connection |
+| **Container smoke test** | Builds the real image, runs it with Docker Compose and PostgreSQL, waits for readiness, writes and reads a message over HTTP, and checks the container runs as non-root UID 10001 with a read-only filesystem |
+| **Terraform** (bootstrap, infra, platform) | Formatting, provider lock files and `terraform validate`, then 18 tests against mocked AWS and Kubernetes providers: private and isolated subnets, DB reachable only on 5432 from the nodes, encrypted non-public DB, IMDSv2, separate Pod Identity roles, restricted Pod Security, default-deny NetworkPolicies, no public plain HTTP, private encrypted state bucket, and input validation |
+
+What CI can't prove: that AWS accepts the configuration (quotas, permissions, Free plan limits), routing, and IAM login to RDS. Those show up only in a real deployment; `mise -E dev run smoke` checks them end to end.
 
 ## Repository layout
 

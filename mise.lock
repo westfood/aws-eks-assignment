@@ -30,19 +30,6 @@ url = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.39.3.zip"
 [tools.awscli."platforms.macos-arm64"]
 url = "https://awscli.amazonaws.com/AWSCLIV2-2.39.3.pkg"
 
-[[tools.helm]]
-version = "3.22.1"
-backend = "aqua:helm/helm"
-specifiers = ["3.22.1"]
-
-[tools.helm."platforms.linux-x64"]
-checksum = "sha256:896cf63684a42a723d61c980369d6e588330927deb13676ca0d85006dd6da0ea"
-url = "https://get.helm.sh/helm-v3.22.1-linux-amd64.tar.gz"
-
-[tools.helm."platforms.macos-arm64"]
-checksum = "sha256:e73da8a0b0d5193774fdff17ce6319c7436bb22ee229b45fd64f3c40368c753a"
-url = "https://get.helm.sh/helm-v3.22.1-darwin-arm64.tar.gz"
-
 [[tools.kubectl]]
 version = "1.36.6"
 backend = "aqua:kubernetes/kubernetes/kubectl"
@@ -55,19 +42,6 @@ url = "https://dl.k8s.io/v1.36.6/bin/linux/amd64/kubectl"
 [tools.kubectl."platforms.macos-arm64"]
 checksum = "sha256:1cf735c3d35ccfec28d0618784cb06a4614d2c42aade28b6be0eab76a2ffb623"
 url = "https://dl.k8s.io/v1.36.6/bin/darwin/arm64/kubectl"
-
-[[tools.node]]
-version = "24.22.2"
-backend = "core:node"
-specifiers = ["24.22.2"]
-
-[tools.node."platforms.linux-x64"]
-checksum = "sha256:361718c444e49af2ca5a110c83ba6a8901143f23ab285ebbef0341f391f482a9"
-url = "https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-x64.tar.gz"
-
-[tools.node."platforms.macos-arm64"]
-checksum = "sha256:aa9549349e47dffaa42dcf95d6e06ade8c4bdafc980979883b88767670df385a"
-url = "https://nodejs.org/dist/v24.22.2/node-v24.22.2-darwin-arm64.tar.gz"
 
 [[tools.python]]
 version = "3.12.16"

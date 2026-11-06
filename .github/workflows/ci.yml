@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   toolset:
-    name: Pinned project toolset
+    name: Toolset and lint
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Set up all pinned project tools
+      - name: Install every pinned tool from mise.lock
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
           version: "2026.10.25"

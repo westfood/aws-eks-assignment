@@ -5,7 +5,7 @@ flowchart TB
     appIdentity["Pod Identity application role: rds-db:connect only"]
     bootstrapIdentity["Separate Pod Identity initialization role"]
     masterSecret["Secrets Manager: RDS-managed master secret"]
-    proposedFrontend["Proposed alternative: CloudFront and private S3 frontend"]
+    proposedFrontend["Proposed frontend, not deployed: CloudFront with private S3 (OAC), /api/* to the ALB"]
 
     subgraph vpc["One VPC across two Availability Zones"]
         subgraph azA["Availability Zone A"]
@@ -39,8 +39,8 @@ flowchart TB
     alb -->|"HTTP 8080, Pod IP targets"| appB
     appA -->|"PostgreSQL 5432, verified TLS"| postgres
     appB -->|"PostgreSQL 5432, verified TLS"| postgres
-    appA -->|"Outbound image pulls and AWS APIs"| natGateway
-    appB -->|"Outbound image pulls and AWS APIs"| natGateway
+    appA -->|"Outbound ECR image pulls and AWS APIs"| natGateway
+    appB -->|"Outbound ECR image pulls and AWS APIs"| natGateway
     operator -->|"Restricted public API CIDRs, IAM and RBAC"| controlPlane
     controlPlane -. "Private API path within VPC" .-> appA
     controlPlane -. "Private API path within VPC" .-> appB
@@ -49,4 +49,5 @@ flowchart TB
     bootstrapIdentity -. "Initialization identity" .-> bootstrapJob
     bootstrapJob -->|"GetSecretValue over HTTPS"| masterSecret
     bootstrapJob -->|"Admin TLS connection, create restricted app user and schema"| postgres
-    proposedFrontend -. "Future design, not deployed by this demo" .-> browser
+    browser -. "Proposed entry point" .-> proposedFrontend
+    proposedFrontend -. "/api/*" .-> alb
