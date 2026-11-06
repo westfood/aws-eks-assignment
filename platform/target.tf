@@ -7,14 +7,15 @@ data "terraform_remote_state" "infra" {
     region = var.aws_region
   }
 }
-# Fails the plan if the tag was never pushed, and pins the Pods to the image digest.
-data "aws_ecr_image" "app" {
+# Lists the pushed images. Unlike aws_ecr_image it doesn't fail on a missing tag, so destroy works without one.
+data "aws_ecr_images" "app" {
   repository_name = local.infra.ecr_repository_name
-  image_tag       = var.image_tag
 }
 locals {
-  infra     = data.terraform_remote_state.infra.outputs
-  app_image = "${local.infra.ecr_repository_url}@${data.aws_ecr_image.app.image_digest}"
+  infra = data.terraform_remote_state.infra.outputs
+  # Pods are pinned to the digest. Null if the tag was never pushed; the Deployment's precondition then fails the plan.
+  image_digest = one([for i in data.aws_ecr_images.app.image_ids : i.image_digest if i.image_tag == var.image_tag])
+  app_image    = local.image_digest == null ? null : "${local.infra.ecr_repository_url}@${local.image_digest}"
 }
 data "aws_eks_cluster" "target" {
   name = local.infra.cluster_name

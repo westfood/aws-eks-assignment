@@ -192,6 +192,13 @@ resource "kubernetes_deployment_v1" "app" {
     }
   }
   depends_on = [kubernetes_job_v1.bootstrap, kubernetes_network_policy_v1.app_ingress]
+  lifecycle {
+    # Checked on plan and apply, not on destroy.
+    precondition {
+      condition     = local.image_digest != null
+      error_message = "Image tag ${var.image_tag} is not in ECR. Push it first: mise -E ${var.environment} run image"
+    }
+  }
 }
 resource "kubernetes_service_v1" "app" {
   metadata {

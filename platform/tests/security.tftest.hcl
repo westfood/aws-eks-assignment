@@ -5,8 +5,13 @@ mock_provider "aws" {
       certificate_authority = [{ data = "dGVzdC1jYQ==" }]
     }
   }
-  mock_data "aws_ecr_image" {
-    defaults = { image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  mock_data "aws_ecr_images" {
+    defaults = {
+      image_ids = [
+        { image_tag = "abc1234", image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        { image_tag = "old0000", image_digest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+      ]
+    }
   }
   mock_data "aws_route53_zone" {
     defaults = { name = "example.com." }
@@ -119,6 +124,11 @@ run "reject_latest_tag" {
   command = plan
   variables { image_tag = "latest" }
   expect_failures = [var.image_tag]
+}
+run "reject_unpushed_image" {
+  command = plan
+  variables { image_tag = "def5678" }
+  expect_failures = [kubernetes_deployment_v1.app]
 }
 run "reject_unknown_environment" {
   command = plan
