@@ -64,13 +64,13 @@ mise -E dev run tf infra init
 mise -E dev run tf infra apply
 ```
 
-**5. App image**: builds `app/` for linux/amd64 and pushes it to ECR tagged with the current Git commit.
+**5. App image**: builds the committed `app/` folder for linux/amd64 and pushes it to ECR, tagged with that folder's Git hash. It skips the push if that version is already there.
 
 ```bash
 mise -E dev run image
 ```
 
-**6. Kubernetes resources**: AWS Load Balancer Controller, NetworkPolicies, a one-time DB setup Job, the app Deployment and the Ingress that creates the ALB. The plan fails if the current commit's image was not pushed.
+**6. Kubernetes resources**: AWS Load Balancer Controller, NetworkPolicies, a one-time DB setup Job, the app Deployment and the Ingress that creates the ALB. The plan fails if the current `app/` version's image was not pushed.
 
 ```bash
 mise -E dev run tf platform init

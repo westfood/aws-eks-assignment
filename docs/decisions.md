@@ -18,7 +18,7 @@
 | WAF managed rules + rate limit | Cheap, meaningful protection at the edge | Not a replacement for authentication |
 | EKS API public endpoint limited to admin IP | Deploy from a laptop without a VPN | Private-only (`private_only_api`) needs a VPC-connected runner |
 | Creator is cluster admin | The EKS default; no IAM ARN lookup needed | Add access entries for other admins or CI roles |
-| Image tag = Git commit, deployed by digest | Immutable ECR tags; the plan fails if the image is missing | Commit before building |
+| Image tag = Git hash of `app/`, deployed by digest | Immutable ECR tags; infra-only commits reuse the image; the plan fails if it is missing | Commit `app/` changes before building |
 | Frontend in the same container | One deployment for the demo | Real frontend: S3 + CloudFront, with `/api` to the ALB |
 | Dev is disposable | One-command teardown for a demo with synthetic data | Test/prod keep deletion protection and final snapshots |
 

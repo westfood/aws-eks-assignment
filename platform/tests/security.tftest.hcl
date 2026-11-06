@@ -59,6 +59,10 @@ run "default_pod_security_and_network_boundaries" {
     error_message = "Avoid writable roots and unnecessary Kubernetes API tokens."
   }
   assert {
+    condition     = kubernetes_deployment_v1.app.spec[0].template[0].spec[0].container[0].security_context[0].run_as_non_root && kubernetes_job_v1.bootstrap.spec[0].template[0].spec[0].container[0].security_context[0].run_as_non_root
+    error_message = "Containers must set run_as_non_root; otherwise the provider sends false and Pod Security rejects the Pod."
+  }
+  assert {
     condition     = kubernetes_service_account_v1.app.metadata[0].name == "contoso-app" && kubernetes_service_account_v1.bootstrap.metadata[0].name == "contoso-bootstrap" && local.db_env.DB_AUTH == "iam" && local.db_env.DB_SSLMODE == "verify-full"
     error_message = "Service account names must match infra's Pod Identity associations; DB TLS must be verified."
   }

@@ -59,11 +59,16 @@ description = "Terraform in one root for the selected env, e.g. mise -E dev run 
 run = "scripts/tf.sh"
 
 [tasks.image]
-description = "Build the app for linux/amd64 and push it to this env's ECR, tagged with the Git commit"
+description = "Build the committed app/ for linux/amd64 and push it to this env's ECR (skipped if already pushed)"
 run = '''
 set -eu
 repo="$(scripts/tf.sh infra output -raw ecr_repository_url)"
-tag="$(git rev-parse --short HEAD)"
+# Tag = Git hash of the committed app/ folder, so infra-only commits don't need a new image.
+tag="$(git rev-parse --short HEAD:app)"
+if aws ecr describe-images --repository-name "${repo#*/}" --image-ids imageTag="$tag" >/dev/null 2>&1; then
+  echo "Already pushed $repo:$tag"
+  exit 0
+fi
 aws ecr get-login-password | docker login --username AWS --password-stdin "${repo%%/*}"
 docker buildx build --platform linux/amd64 --provenance=false --tag "$repo:$tag" --push app
 echo "Pushed $repo:$tag"

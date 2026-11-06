@@ -17,8 +17,8 @@ fi
 
 # One state bucket per environment account; the account ID keeps the name globally unique.
 export TF_VAR_state_bucket_name="contoso-$DEPLOY_ENV-tfstate-$TF_VAR_aws_account_id"
-# The platform deploys the image `mise run image` pushed for the current commit, unless overridden.
-export TF_VAR_image_tag="${TF_VAR_image_tag:-$(git rev-parse --short HEAD)}"
+# The platform deploys the image `mise run image` pushed for the committed app/ folder, unless overridden.
+export TF_VAR_image_tag="${TF_VAR_image_tag:-$(git rev-parse --short HEAD:app)}"
 # Separate provider and backend cache per environment, e.g. infra/.terraform/dev.
 export TF_DATA_DIR=".terraform/$DEPLOY_ENV"
 

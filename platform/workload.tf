@@ -76,7 +76,10 @@ resource "kubernetes_job_v1" "bootstrap" {
             requests = { cpu = "100m", memory = "128Mi" }
             limits   = { cpu = "500m", memory = "256Mi" }
           }
+          # Set explicitly: the provider otherwise sends runAsNonRoot=false, which overrides the Pod setting
+          # and is rejected by the namespace's restricted Pod Security standard.
           security_context {
+            run_as_non_root            = true
             allow_privilege_escalation = false
             read_only_root_filesystem  = true
             capabilities { drop = ["ALL"] }
@@ -144,7 +147,10 @@ resource "kubernetes_deployment_v1" "app" {
             requests = { cpu = "100m", memory = "128Mi" }
             limits   = { memory = "256Mi" }
           }
+          # Set explicitly: the provider otherwise sends runAsNonRoot=false, which overrides the Pod setting
+          # and is rejected by the namespace's restricted Pod Security standard.
           security_context {
+            run_as_non_root            = true
             allow_privilege_escalation = false
             read_only_root_filesystem  = true
             capabilities { drop = ["ALL"] }
