@@ -68,11 +68,12 @@ done
 '''
 
 [tasks.lint]
-description = "Lint the workflow, mise tasks and the Terraform wrapper script"
+description = "Lint the workflow, mise tasks and the shell scripts"
 run = [
   "actionlint",
   "mise tasks validate",
   "bash -n scripts/tf.sh",
+  "bash -n scripts/image-tag.sh",
 ]
 
 [tasks.check]
@@ -90,12 +91,12 @@ description = "Terraform in one root for the selected env, e.g. mise -E dev run 
 run = "scripts/tf.sh"
 
 [tasks.image]
-description = "Build the committed app/ for linux/amd64 and push it to this env's ECR (skipped if already pushed)"
+description = "Build the committed app image for linux/amd64 and push it to this env's ECR (skipped if already pushed)"
 run = '''
 set -eu
 repo="$(scripts/tf.sh infra output -raw ecr_repository_url)"
-# Tag = Git hash of the committed app/ folder, so infra-only commits don't need a new image.
-tag="$(git rev-parse --short HEAD:app)"
+# Tag = hash of the committed files the image is built from, so other commits reuse the image.
+tag="$(scripts/image-tag.sh)"
 if aws ecr describe-images --repository-name "${repo#*/}" --image-ids imageTag="$tag" >/dev/null 2>&1; then
   echo "Already pushed $repo:$tag"
   exit 0

@@ -35,7 +35,7 @@ Region is **eu-north-1**.
 | --- | --- |
 | [mise](https://mise.jdx.dev/getting-started.html) | Everything. It installs Terraform, AWS CLI, kubectl, Python and actionlint at the versions pinned in [mise.toml](mise.toml) |
 | Docker with Buildx and Compose | [Checks](#checks-no-aws) and building the app image |
-| Git | Image tags come from the Git hash of `app/` |
+| Git | Image tags are a hash of the committed app files ([scripts/image-tag.sh](scripts/image-tag.sh)) |
 | An AWS project per environment, with profile `contoso-<env>-admin` | Deploying only |
 
 Then, once in the repository:
@@ -76,13 +76,13 @@ mise -E dev run tf infra init
 mise -E dev run tf infra apply
 ```
 
-**5. App image**: builds the committed `app/` folder for linux/amd64 and pushes it to ECR, tagged with that folder's Git hash. It skips the push if that version is already there.
+**5. App image**: builds the committed app for linux/amd64 and pushes it to ECR. The tag is a hash of only the files in the image (`Dockerfile`, `requirements.txt`, `demo/`, `certs/`), so README, test and infra changes reuse it. It skips the push if that tag is already there.
 
 ```bash
 mise -E dev run image
 ```
 
-**6. Kubernetes resources**: AWS Load Balancer Controller, NetworkPolicies, a one-time DB setup Job, the app Deployment and the Ingress that creates the ALB. The plan fails if the current `app/` version's image was not pushed.
+**6. Kubernetes resources**: AWS Load Balancer Controller, NetworkPolicies, a one-time DB setup Job, the app Deployment and the Ingress that creates the ALB. The plan fails if the current image tag was not pushed.
 
 ```bash
 mise -E dev run tf platform init
@@ -144,7 +144,7 @@ docker compose up --build # app + PostgreSQL locally on http://127.0.0.1:18080
 
 | Task (CI job) | What it tests |
 | --- | --- |
-| `lint` (Toolset and lint) | The workflow passes actionlint, mise tasks are valid, `scripts/tf.sh` parses. In CI, also that every tool in `mise.lock` installs on Linux at its pinned version and checksum |
+| `lint` (Toolset and lint) | The workflow passes actionlint, mise tasks are valid, the scripts parse. In CI, also that every tool in `mise.lock` installs on Linux at its pinned version and checksum |
 | `app:test` (App tests with PostgreSQL) | 23 app tests, 4 of them against the Compose PostgreSQL 17: write and read back a message, user input stored as literal data (no SQL injection), the app's DB role can't create or delete tables, setup works without a superuser. The rest cover health checks, input validation, error hiding, security headers, enforced TLS to the DB and fresh IAM tokens per connection |
 | `app:smoke` (Container smoke test) | Builds the real image, runs it with Docker Compose and PostgreSQL, writes and reads a message over HTTP, and checks the container runs as UID 10001 and can't write to its root filesystem |
 | `tf:check` (Terraform) | Formatting, provider lock files and `terraform validate` for all three roots, then 19 tests against mocked AWS and Kubernetes providers: private and isolated subnets, DB reachable only on 5432 from the nodes, encrypted non-public DB, IMDSv2, separate Pod Identity roles, restricted Pod Security, default-deny NetworkPolicies, no public plain HTTP, image must be pushed, private encrypted state bucket, and input validation |
