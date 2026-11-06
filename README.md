@@ -29,14 +29,26 @@ Everything runs through mise with an explicit environment: `mise -E dev run <tas
 
 Region is **eu-north-1**.
 
-## Deploy dev
+## Prerequisites
 
-You need [mise](https://mise.jdx.dev/getting-started.html), Git and Docker with Buildx. mise installs Terraform, AWS CLI, kubectl, Python and actionlint at the versions pinned in [mise.toml](mise.toml).
+| | Needed for |
+| --- | --- |
+| [mise](https://mise.jdx.dev/getting-started.html) | Everything. It installs Terraform, AWS CLI, kubectl, Python and actionlint at the versions pinned in [mise.toml](mise.toml) |
+| Docker with Buildx and Compose | [Checks](#checks-no-aws) and building the app image |
+| Git | Image tags come from the Git hash of `app/` |
+| An AWS project per environment, with profile `contoso-<env>-admin` | Deploying only |
 
-**1. Tools and sign-in**
+Then, once in the repository:
 
 ```bash
 mise trust && mise install --locked
+```
+
+## Deploy dev
+
+**1. Sign in**
+
+```bash
 mise exec -- aws login --profile contoso-dev-admin
 ```
 
