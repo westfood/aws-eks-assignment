@@ -31,9 +31,15 @@ variable "state_bucket_name" {
   }
 }
 
+variable "state_force_destroy" {
+  description = "Allow destroy to delete the bucket with all state versions. Only for disposable environments."
+  type        = bool
+  default     = false
+}
+
 resource "aws_s3_bucket" "state" {
   bucket        = var.state_bucket_name
-  force_destroy = false
+  force_destroy = var.state_force_destroy
 }
 
 resource "aws_s3_bucket_public_access_block" "state" {

@@ -20,6 +20,15 @@ run "state_is_private_encrypted_and_versioned" {
   }
 }
 
+run "disposable_state_bucket_is_opt_in" {
+  command = plan
+  variables { state_force_destroy = true }
+  assert {
+    condition     = aws_s3_bucket.state.force_destroy
+    error_message = "A disposable environment must be able to delete its state bucket with all versions."
+  }
+}
+
 run "test_state_target" {
   command = plan
   variables {

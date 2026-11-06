@@ -129,7 +129,14 @@ mise -E dev run tf platform destroy
 mise -E dev run tf infra destroy
 ```
 
-The state bucket stays; it costs cents. Test and prod keep deletion protection and final snapshots, so destroying them deliberately takes two steps.
+The state bucket stays; it costs cents. To remove it as well, apply once so Terraform records that dev may delete the bucket with all its state versions, then destroy:
+
+```bash
+mise -E dev run tf bootstrap apply
+mise -E dev run tf bootstrap destroy
+```
+
+Test and prod keep deletion protection, final snapshots and their state bucket, so destroying them deliberately takes two steps.
 
 **Cost (rough estimate, eu-north-1):** dev costs about **$0.25–0.30 per hour (~$7 per day)** for the EKS control plane, two nodes, NAT, ALB, RDS and WAF. The project is on the Free plan with $100 credit, so deploy shortly before the interview and destroy it afterwards. Spend is in AWS Settings › Billing.
 
@@ -147,7 +154,7 @@ docker compose up --build # app + PostgreSQL locally on http://127.0.0.1:18080
 | `lint` (Toolset and lint) | The workflow passes actionlint, mise tasks are valid, the scripts parse. In CI, also that every tool in `mise.lock` installs on Linux at its pinned version and checksum |
 | `app:test` (App tests with PostgreSQL) | 23 app tests, 4 of them against the Compose PostgreSQL 17: write and read back a message, user input stored as literal data (no SQL injection), the app's DB role can't create or delete tables, setup works without a superuser. The rest cover health checks, input validation, error hiding, security headers, enforced TLS to the DB and fresh IAM tokens per connection |
 | `app:smoke` (Container smoke test) | Builds the real image, runs it with Docker Compose and PostgreSQL, writes and reads a message over HTTP, and checks the container runs as UID 10001 and can't write to its root filesystem |
-| `tf:check` (Terraform) | Formatting, provider lock files and `terraform validate` for all three roots, then 19 tests against mocked AWS and Kubernetes providers: private and isolated subnets, DB reachable only on 5432 from the nodes, encrypted non-public DB, expiring DB logs, IMDSv2, separate Pod Identity roles, restricted Pod Security, default-deny NetworkPolicies, no public plain HTTP, image must be pushed, private encrypted state bucket, and input validation |
+| `tf:check` (Terraform) | Formatting, provider lock files and `terraform validate` for all three roots, then 20 tests against mocked AWS and Kubernetes providers: private and isolated subnets, DB reachable only on 5432 from the nodes, encrypted non-public DB, expiring DB logs, IMDSv2, separate Pod Identity roles, restricted Pod Security, default-deny NetworkPolicies, no public plain HTTP, image must be pushed, private encrypted state bucket, and input validation |
 
 What CI can't prove: that AWS accepts the configuration (quotas, permissions, Free plan limits), routing, and IAM login to RDS. Those show up only in a real deployment; `mise -E dev run smoke` checks them end to end.
 
