@@ -1,6 +1,6 @@
 # Speaker notes
 
-Companion to [contoso-iac-stakeholder.key](contoso-iac-stakeholder.key): the text on each slide, what to say, sources, and answers to likely questions. About 1,000 spoken words, so 8–10 minutes, which leaves time for questions in a 10–15 minute slot. The same notes are in the deck's presenter notes.
+Companion to [contoso-iac-stakeholder.key](contoso-iac-stakeholder.key): the text on each slide, what to say, sources, and answers to likely questions. About 1,100 spoken words, so 9–10 minutes, which leaves time for questions in a 10–15 minute slot. The same notes are in the deck's presenter notes.
 
 ---
 
@@ -14,7 +14,29 @@ Contoso has started using AWS, and many teams will follow. Before they do, they 
 
 ---
 
-## 2. One foundation before departments move in
+## 2. Each department builds AWS its own way
+
+**On slide**
+
+| | |
+| --- | --- |
+| Inconsistent security | Accounts are set up by hand, each with different settings. |
+| Slow onboarding | Every new team waits weeks for a manually built account. |
+| No audit trail | Console changes leave no record of who changed what. |
+| Can't rebuild | Nobody can recreate an account exactly after an incident. |
+| Silent drift | Manual fixes pile up unnoticed until something breaks. |
+
+*Every team that moves in makes this worse, so the foundation has to come first.*
+
+**Notes**
+
+Before the options, the problem. Contoso has started with AWS, and more departments are about to follow. Without a shared foundation, each one sets up its accounts by hand and in its own way. Security settings and logging differ from account to account, so gaps are hard to see. New teams wait weeks for an account. Changes are made in the console, so nobody can show an auditor who changed what, or why. After an incident nobody can rebuild an account exactly, and manual fixes drift further from any standard. None of this hurts on day one; it grows with every team that moves in. That's why the foundation comes first.
+
+**Sources:** [Establishing your cloud foundation on AWS](https://docs.aws.amazon.com/whitepapers/latest/establishing-your-cloud-foundation-on-aws/welcome.html)
+
+---
+
+## 3. One foundation before departments move in
 
 **On slide**
 
@@ -26,17 +48,17 @@ Contoso has started using AWS, and many teams will follow. Before they do, they 
 | Rebuildable | The whole foundation can be recreated from code. |
 | Less drift | Manual changes are detected and corrected. |
 
-*Without it, each department builds AWS its own way: inconsistent security, slow onboarding and no audit trail.*
+*Each benefit answers one of those risks. Any IaC tool delivers them; the tool decides the effort.*
 
 **Notes**
 
-The risk at this stage is not technology, it's inconsistency. If each department sets up AWS on its own, Contoso ends up with different security settings, unclear ownership and a slow, manual onboarding process. Infrastructure as Code turns the foundation into reviewed, versioned definitions. The same baseline then applies to every account, a new team gets a ready account quickly, and every change has an author, a reviewer and a history, which is exactly what auditors ask for. Because the foundation is code, it can be rebuilt, and drift from manual changes becomes visible. These benefits are the same whichever tool we pick; the tool decides how much effort they cost.
+Infrastructure as Code answers each of these risks, in the same order. The foundation becomes reviewed, versioned definitions. The same baseline applies to every account, a new team gets a ready account in hours, and every change has an author, a reviewer and a history, which is exactly what auditors ask for. Because the foundation is code, it can be rebuilt, and drift from manual changes becomes visible and is corrected. These benefits are the same whichever tool we pick; the tool decides how much effort they cost.
 
 **Sources:** [What is CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html), [Drift detection](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-stack-drift.html)
 
 ---
 
-## 3. The landing zone: accounts and guardrails
+## 4. The landing zone: accounts and guardrails
 
 **On slide**
 
@@ -58,7 +80,7 @@ This is the structure the code delivers. Control Tower sets up the organization,
 
 ---
 
-## 4. Three ways to write it, two engines to run it
+## 5. Three ways to write it, two engines to run it
 
 **On slide**
 
@@ -79,7 +101,7 @@ All three can build a landing zone; the differences are in what the team writes,
 
 ---
 
-## 5. Terraform: one tool across providers
+## 6. Terraform: one tool across providers
 
 **On slide**
 
@@ -99,7 +121,7 @@ Terraform's strength is breadth. One workflow can manage AWS together with ident
 
 ---
 
-## 6. CloudFormation: nothing extra to operate
+## 7. CloudFormation: nothing extra to operate
 
 **On slide**
 
@@ -119,7 +141,7 @@ CloudFormation is AWS's own IaC service, so there is no state for the team to ru
 
 ---
 
-## 7. CDK: infrastructure as real code
+## 8. CDK: infrastructure as real code
 
 **On slide:** *Platform code and constructs → Synthesized CloudFormation → Landing-zone stacks and resources*
 
@@ -139,7 +161,7 @@ The CDK suits platform teams that think like software teams. It brings loops, re
 
 ---
 
-## 8. CloudFormation on Control Tower
+## 9. CloudFormation on Control Tower
 
 **On slide**
 
@@ -160,7 +182,7 @@ My recommendation is CloudFormation, on top of Control Tower. Four reasons. Firs
 
 ---
 
-## 9. How a change reaches AWS
+## 10. How a change reaches AWS
 
 **On slide:** *Pull request in Git → Checks and preview → Approval for guardrails → Pipeline deploys, then drift check*
 
@@ -178,7 +200,7 @@ Every change follows one path. An engineer opens a pull request. Automated check
 
 ---
 
-## 10. Roadmap and decisions needed
+## 11. Roadmap and decisions needed
 
 **On slide**
 
