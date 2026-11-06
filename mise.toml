@@ -13,7 +13,7 @@ awscli = "2.39.3"
 kubectl = "1.36.6"
 actionlint = "1.7.12"
 
-# --- Local checks (no AWS) ---
+# --- Checks (no AWS): the same tasks run locally and in GitHub Actions ---
 
 [tasks."app:setup"]
 description = "Create app/.venv and install locked app dependencies"
@@ -24,10 +24,36 @@ run = [
 ]
 
 [tasks."app:test"]
-description = "Run application tests; DB integration needs explicit settings (see app/README.md)"
+description = "Run all app tests, including real PostgreSQL tests against the Compose database"
 depends = ["app:setup"]
 dir = "app"
-run = ".venv/bin/python -m unittest discover -s tests -v"
+# Same disposable credentials as compose.yml; the database is published on 127.0.0.1 only.
+env = { APP_ENV = "local", DB_AUTH = "password", DB_HOST = "127.0.0.1", DB_PORT = "55432", DB_NAME = "contoso", DB_USER = "contoso_app", DB_PASSWORD = "local-demo-only", DB_SSLMODE = "disable", BOOTSTRAP_DB_USER = "postgres", BOOTSTRAP_DB_PASSWORD = "local-admin-only", RUN_DB_INTEGRATION = "1" }
+run = [
+  "docker compose up --detach --wait postgres",
+  ".venv/bin/python -m unittest discover -s tests -v",
+]
+
+[tasks."app:smoke"]
+description = "Build the image, run it with Compose and PostgreSQL, write and read a message"
+# Both tasks use the Compose database; don't start it twice at the same time.
+wait_for = ["app:test"]
+run = '''
+set -eu
+docker compose up --build --detach --wait app
+url=http://127.0.0.1:18080
+body="compose smoke test $(date -u +%FT%TZ)"
+curl -fsS "$url/readyz"; echo
+curl -fsS -X POST -H 'Content-Type: application/json' -d "{\"body\":\"$body\"}" "$url/api/messages"; echo
+curl -fsS "$url/api/messages" | grep -qF "$body"
+# The container must run as the unprivileged app user with a read-only filesystem.
+test "$(docker compose exec -T app id -u)" = 10001
+if docker compose exec -T app touch /probe 2>/dev/null; then
+  echo "Container root filesystem is writable" >&2
+  exit 1
+fi
+echo "Container smoke test passed; stop it with: docker compose down"
+'''
 
 [tasks."tf:check"]
 description = "Format check, validate and mock-test all Terraform roots without AWS"
@@ -41,10 +67,17 @@ for root in bootstrap infra platform; do
 done
 '''
 
+[tasks.lint]
+description = "Lint the workflow, mise tasks and the Terraform wrapper script"
+run = [
+  "actionlint",
+  "mise tasks validate",
+  "bash -n scripts/tf.sh",
+]
+
 [tasks.check]
-description = "All local checks: app tests, Terraform, workflow lint"
-depends = ["app:test", "tf:check"]
-run = "actionlint"
+description = "Everything GitHub Actions runs: lint, app tests, container smoke test, Terraform (needs Docker)"
+depends = ["lint", "app:test", "app:smoke", "tf:check"]
 
 [tasks."diagrams:export"]
 description = "Export draw.io pages (requires draw.io Desktop or DRAWIO_BIN)"

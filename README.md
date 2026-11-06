@@ -121,23 +121,21 @@ The state bucket stays; it costs cents. Test and prod keep deletion protection a
 
 **Cost (rough estimate, eu-north-1):** dev costs about **$0.25–0.30 per hour (~$7 per day)** for the EKS control plane, two nodes, NAT, ALB, RDS and WAF. The project is on the Free plan with $100 credit, so deploy shortly before the interview and destroy it afterwards. Spend is in AWS Settings › Billing.
 
-## Local checks (no AWS)
+## Checks (no AWS)
+
+The same checks run locally and in [GitHub Actions](.github/workflows/ci.yml) on every push and pull request: each CI job runs one mise task. Locally, run them all with Docker running:
 
 ```bash
-mise run check            # app tests, Terraform fmt/validate/mocked tests, workflow lint
+mise run check            # all four tasks below, about a minute when cached
 docker compose up --build # app + PostgreSQL locally on http://127.0.0.1:18080
 ```
 
-## GitHub checks
-
-[GitHub Actions](.github/workflows/ci.yml) runs four jobs on every push and pull request. None of them uses AWS credentials.
-
-| Check | What it tests |
+| Task (CI job) | What it tests |
 | --- | --- |
-| **Toolset and lint** | Every tool in `mise.lock` installs on Linux at its pinned version and checksum; mise tasks are valid; the workflow passes actionlint; `scripts/tf.sh` parses |
-| **Application and PostgreSQL integration** | 23 app tests, 4 of them against a real PostgreSQL 17: write and read back a message, user input stored as literal data (no SQL injection), the app's DB role can't create or delete tables, setup works without a superuser. The rest cover health checks, input validation, error hiding, security headers, enforced TLS to the DB and fresh IAM tokens per connection |
-| **Container smoke test** | Builds the real image, runs it with Docker Compose and PostgreSQL, waits for readiness, writes and reads a message over HTTP, and checks the container runs as non-root UID 10001 with a read-only filesystem |
-| **Terraform** (bootstrap, infra, platform) | Formatting, provider lock files and `terraform validate`, then 18 tests against mocked AWS and Kubernetes providers: private and isolated subnets, DB reachable only on 5432 from the nodes, encrypted non-public DB, IMDSv2, separate Pod Identity roles, restricted Pod Security, default-deny NetworkPolicies, no public plain HTTP, private encrypted state bucket, and input validation |
+| `lint` (Toolset and lint) | The workflow passes actionlint, mise tasks are valid, `scripts/tf.sh` parses. In CI, also that every tool in `mise.lock` installs on Linux at its pinned version and checksum |
+| `app:test` (App tests with PostgreSQL) | 23 app tests, 4 of them against the Compose PostgreSQL 17: write and read back a message, user input stored as literal data (no SQL injection), the app's DB role can't create or delete tables, setup works without a superuser. The rest cover health checks, input validation, error hiding, security headers, enforced TLS to the DB and fresh IAM tokens per connection |
+| `app:smoke` (Container smoke test) | Builds the real image, runs it with Docker Compose and PostgreSQL, writes and reads a message over HTTP, and checks the container runs as UID 10001 and can't write to its root filesystem |
+| `tf:check` (Terraform) | Formatting, provider lock files and `terraform validate` for all three roots, then 18 tests against mocked AWS and Kubernetes providers: private and isolated subnets, DB reachable only on 5432 from the nodes, encrypted non-public DB, IMDSv2, separate Pod Identity roles, restricted Pod Security, default-deny NetworkPolicies, no public plain HTTP, private encrypted state bucket, and input validation |
 
 What CI can't prove: that AWS accepts the configuration (quotas, permissions, Free plan limits), routing, and IAM login to RDS. Those show up only in a real deployment; `mise -E dev run smoke` checks them end to end.
 

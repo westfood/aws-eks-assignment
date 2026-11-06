@@ -70,30 +70,15 @@ RDS's master user is not a PostgreSQL superuser. Initialization therefore create
 
 ## Tests
 
-Use the repository's mise-pinned Python and an isolated virtual environment. From the repository root, complete `mise install --locked` after reviewing/trusting the config, then run:
+From the repository root, with Docker running:
 
 ```sh
 mise run app:test
 ```
 
-The task first runs `app:setup`, which creates `app/.venv` using the selected Python, installs `app/requirements.txt` and checks package compatibility. Run `mise run app:setup` alone when you only need the environment. The tool versions come from the root mise configuration; Python packages remain pinned separately in `requirements.txt`.
+The task creates `app/.venv` with the mise-pinned Python (`app:setup`), starts the Compose PostgreSQL on `127.0.0.1:55432`, and runs all 23 tests. GitHub Actions runs the same task. No AWS credentials are needed.
 
-Unit tests require no AWS credentials, Docker engine or database. The four PostgreSQL integration tests are skipped unless explicitly enabled. To run them against the dedicated Compose database, after starting Compose and from the repository root:
-
-```sh
-APP_ENV=local DB_AUTH=password \
-DB_HOST=127.0.0.1 DB_PORT=55432 DB_NAME=contoso DB_USER=contoso_app \
-DB_PASSWORD=local-demo-only DB_SSLMODE=disable \
-BOOTSTRAP_DB_USER=postgres BOOTSTRAP_DB_PASSWORD=local-admin-only \
-RUN_DB_INTEGRATION=1 \
-mise run app:test
-```
-
-Integration tests are for the disposable local demo database only. They initialize the schema twice, verify real read/write and literal SQL/HTML payload handling, check runtime privilege restrictions, and create/remove a uniquely named database and roles to verify bootstrap without PostgreSQL `SUPERUSER`. They remove only their own marker rows and fixture database/roles. The supplied local admin must have sufficient privileges for those fixtures.
-
-Local verification on 2026-11-03: all **23 tests passed**, including all four integration tests on an isolated native PostgreSQL 18.6 instance. The real browser saved and read a synthetic message through Gunicorn, with desktop/mobile screenshots in `evidence/`. `pip check`, Linux AMD64/Python 3.12 binary-wheel resolution, and `docker compose config --quiet` passed. The local Docker daemon returned HTTP 500, so local container execution was unavailable.
-
-[GitHub Actions run 41646044307](https://github.com/westfood/aws-eks-assignment/actions/runs/41646044307) passed on 2026-11-03 at commit `1c5789402ac3ea256e67d7ad832751486da06606`. It ran all **23 app tests**, including the four integration tests against the pinned PostgreSQL 17 image, and all six deployment-helper tests. A separate job built the actual application image, completed database bootstrap, verified readiness and a real API write/read round trip, checked liveness, and confirmed UID `10001` and a read-only container root. All three Terraform roots also passed formatting, validation and mocked-provider tests. The CI jobs used no AWS credentials and created no AWS resources. IAM login, IRSA, RDS hostname-verified TLS and AWS network paths still require the eventual live AWS smoke test.
+The four PostgreSQL integration tests are for the disposable local database only. They initialize the schema twice, verify real read/write and literal SQL/HTML payload handling, check runtime privilege restrictions, and create/remove a uniquely named database and roles to verify bootstrap without PostgreSQL `SUPERUSER`. They remove only their own marker rows and fixture database/roles.
 
 ## Dependency and certificate provenance
 
